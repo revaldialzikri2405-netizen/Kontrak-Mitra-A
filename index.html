@@ -145,6 +145,7 @@
   <!-- TAB 1: FORM KONTRAK -->
   <section id="tabForm" class="tab-panel">
     <div class="card">
+      <div id="dbErrorAlert" class="notice error hidden"></div>
       <div id="noTemplateAlert" class="notice error hidden">
         <strong>Belum ada Kontrak Acuan aktif!</strong> Buka tab <strong>📂 Kontrak Acuan</strong> untuk meng-upload file <code>.docx</code> pertama kali.
       </div>
@@ -402,12 +403,12 @@
 "use strict";
 
 // =====================================================================
-// KONFIGURASI SUPABASE — GANTI 2 BARIS DI BAWAH DENGAN PROJECT LO!
+// KONFIGURASI SUPABASE (SUDAH TERHUBUNG KE PROJECT KONTRAK MITRA A)
 // =====================================================================
-const SUPABASE_URL = "https://PROJECT_ID_LO.supabase.co";
-const SUPABASE_ANON_KEY = "ANON_KEY_LO";
+const SUPABASE_URL = "https://lpjkhihdarlehixoskht.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_Cma34qB6pdFN6VveEY51Zw_uU_3-kJp";
 
-const isConfigured = !SUPABASE_URL.includes("PROJECT_ID_LO") && !SUPABASE_ANON_KEY.includes("ANON_KEY_LO");
+const isConfigured = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY && !SUPABASE_URL.includes("PROJECT_ID_LO"));
 const sb = isConfigured ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 
 // =====================================================================
@@ -941,11 +942,20 @@ async function generateLegacyDocx(zip, v) {
 // SUPABASE DATA LOADERS & UI RENDERERS
 // =====================================================================
 async function loadAllData() {
+  const errBox = $("dbErrorAlert");
+  errBox.classList.add("hidden");
+
   const [setRes, tplRes, histRes] = await Promise.all([
     sb.from("app_settings").select("*").eq("id", 1).single(),
     sb.from("contract_templates").select("*").order("created_at", { ascending: false }),
     sb.from("contract_history").select("*").order("created_at", { ascending: false }).limit(100)
   ]);
+
+  const firstErr = setRes.error || tplRes.error || histRes.error;
+  if (firstErr) {
+    errBox.innerHTML = `<strong>Gagal membaca database Supabase:</strong> ${esc(firstErr.message)}. Pastikan kode SQL setup sudah dijalankan di SQL Editor Supabase.`;
+    errBox.classList.remove("hidden");
+  }
 
   if (setRes.data) { appSettings = setRes.data; populateSettingsForm(); }
   templatesList = tplRes.data || [];
@@ -980,7 +990,7 @@ function renderActiveTemplateUI() {
   badge.className = `badge ${activeTemplate.mode}`;
   badge.classList.remove("hidden");
 
-  infoBox.innerHTML = `<strong>Kontrak Acuan Aktif:</strong> ${esc(activeTemplate.name)} &nbsp;|&nbsp; Mode: <code>${esc(activeTemplate.mode.toUpperCase())}</code> &nbsp;|&nbsp; Pihak Pertama: <strong>PT ${esc(appSettings.first_party.first_party_pt_entity)}</strong> (PIC: ${esc(appSettings.first_party.first_party_signatory)})`;
+  infoBox.innerHTML = `<strong>Kontrak Acuan Aktif:</strong> ${esc(activeTemplate.name)} &nbsp;|&nbsp; Mode: <code>${esc(activeTemplate.mode.toUpperCase())}</code> &nbsp;|&nbsp; Pihak Pertama: <strong>PT ${esc(appSettings.first_party.first_party_pt_entity || "-")}</strong> (PIC: ${esc(appSettings.first_party.first_party_signatory || "-")})`;
   infoBox.classList.remove("hidden");
 
   const customTags = Array.isArray(activeTemplate.custom_tags) ? activeTemplate.custom_tags : [];
