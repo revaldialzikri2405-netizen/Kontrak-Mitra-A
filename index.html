@@ -1,160 +1,591 @@
 <!doctype html>
-<html lang="id">
+<html lang="id" data-theme="dark">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Sistem Kontrak Mitra A — Cloud Generator</title>
+  <title>Kontrak Mitra A — Cloud Studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
   <style>
     :root {
-      color-scheme: light;
-      --navy: #173b5e;
-      --blue: #245b86;
-      --ink: #1e293b;
-      --muted: #64748b;
-      --line: #dbe3ec;
-      --paper: #ffffff;
-      --bg: #f1f5f9;
-      --input: #fffdf2;
-      --green: #15803d;
-      --red: #b91c1c;
-      --amber: #b45309;
+      color-scheme: dark;
+      --bg: #080b12;
+      --bg-dot: rgba(148, 163, 184, 0.14);
+      --surface: rgba(17, 23, 38, 0.86);
+      --surface-solid: #111726;
+      --surface-2: #161f33;
+      --border: rgba(148, 163, 184, 0.16);
+      --border-strong: rgba(148, 163, 184, 0.3);
+      --text: #f1f5f9;
+      --text-soft: #94a3b8;
+      --accent: #10b981;
+      --accent-2: #38bdf8;
+      --accent-glow: rgba(16, 185, 129, 0.22);
+      --input-bg: #0c1220;
+      --danger: #f43f5e;
+      --danger-bg: rgba(244, 63, 94, 0.12);
+      --warn: #f59e0b;
+      --warn-bg: rgba(245, 158, 11, 0.12);
+      --info-bg: rgba(56, 189, 248, 0.11);
+      --shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+      --font-sans: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
+      --font-mono: "JetBrains Mono", ui-monospace, monospace;
     }
+
+    [data-theme="light"] {
+      color-scheme: light;
+      --bg: #f3f6fb;
+      --bg-dot: rgba(15, 23, 42, 0.08);
+      --surface: rgba(255, 255, 255, 0.9);
+      --surface-solid: #ffffff;
+      --surface-2: #f8fafc;
+      --border: rgba(15, 23, 42, 0.1);
+      --border-strong: rgba(15, 23, 42, 0.2);
+      --text: #0f172a;
+      --text-soft: #64748b;
+      --accent: #059669;
+      --accent-2: #0284c7;
+      --accent-glow: rgba(5, 150, 105, 0.16);
+      --input-bg: #ffffff;
+      --danger: #e11d48;
+      --danger-bg: rgba(225, 29, 72, 0.08);
+      --warn: #d97706;
+      --warn-bg: rgba(217, 119, 6, 0.1);
+      --info-bg: rgba(2, 132, 199, 0.08);
+      --shadow: 0 18px 45px rgba(15, 23, 42, 0.08);
+    }
+
     * { box-sizing: border-box; }
-    body { margin: 0; background: var(--bg); color: var(--ink); font: 14.5px/1.5 "Segoe UI", system-ui, sans-serif; }
+    html, body { min-height: 100%; }
+    body {
+      margin: 0;
+      background-color: var(--bg);
+      background-image:
+        radial-gradient(circle at 12% 10%, rgba(16, 185, 129, 0.14), transparent 36%),
+        radial-gradient(circle at 88% 8%, rgba(56, 189, 248, 0.12), transparent 34%),
+        radial-gradient(var(--bg-dot) 1px, transparent 1px);
+      background-size: 100% 100%, 100% 100%, 24px 24px;
+      background-attachment: fixed;
+      color: var(--text);
+      font: 14.5px/1.55 var(--font-sans);
+      transition: background-color .25s ease, color .25s ease;
+    }
+
     .hidden { display: none !important; }
 
-    /* Topbar */
-    .topbar { background: var(--navy); color: #fff; padding: 14px 24px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-    .brand { font-size: 18px; font-weight: 700; display: flex; align-items: center; gap: 10px; }
-    .badge { font-size: 11.5px; font-weight: 600; padding: 3px 9px; border-radius: 999px; background: rgba(255,255,255,.16); color: #fff; }
-    .badge.dynamic { background: #16a34a; }
-    .badge.legacy { background: #d97706; }
-    .user-bar { display: flex; align-items: center; gap: 12px; font-size: 13px; }
-    .user-bar button { min-height: 34px; padding: 6px 12px; font-size: 13px; background: rgba(255,255,255,.15); }
-    .user-bar button:hover { background: rgba(255,255,255,.28); }
+    /* Glass Topbar */
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 40;
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      background: color-mix(in srgb, var(--surface-solid) 78%, transparent);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 800;
+      font-size: 16px;
+      letter-spacing: -0.02em;
+    }
+    .brand-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      display: grid;
+      place-items: center;
+      font-size: 17px;
+      box-shadow: 0 6px 20px var(--accent-glow);
+      color: #fff;
+    }
+    .brand-sub {
+      display: block;
+      font: 600 10.5px/1 var(--font-mono);
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--text-soft);
+      margin-top: 3px;
+    }
 
-    /* Layout & Tabs */
-    main { max-width: 1060px; margin: 24px auto 50px; padding: 0 18px; }
-    .tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 18px; }
-    .tab-btn { background: #e2e8f0; color: #334155; border: 0; border-radius: 8px; padding: 10px 16px; font: 600 14px inherit; cursor: pointer; min-height: 40px; }
-    .tab-btn.active { background: var(--navy); color: #fff; }
-    .tab-btn:hover:not(.active) { background: #cbd5e1; }
+    .top-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      font: 600 11.5px/1 var(--font-mono);
+      padding: 7px 11px;
+      border-radius: 999px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+    .badge::before {
+      content: "";
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--text-soft);
+    }
+    .badge.dynamic { border-color: rgba(16, 185, 129, 0.4); color: var(--accent); background: rgba(16, 185, 129, 0.1); }
+    .badge.dynamic::before { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+    .badge.legacy { border-color: rgba(245, 158, 11, 0.4); color: var(--warn); background: var(--warn-bg); }
+    .badge.legacy::before { background: var(--warn); }
 
-    .card { background: var(--paper); border: 1px solid var(--line); border-radius: 12px; padding: 22px; box-shadow: 0 4px 16px rgba(15, 23, 42, .05); margin-bottom: 16px; }
-    .login-wrap { max-width: 420px; margin: 64px auto; }
-    h1, h2 { color: var(--navy); margin: 0 0 8px; }
-    h2 { font-size: 19px; }
-    .muted { color: var(--muted); font-size: 13.5px; margin: 0 0 14px; }
+    .user-bar { display: flex; align-items: center; gap: 10px; }
+    .user-pill {
+      font: 500 12.5px var(--font-mono);
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      color: var(--text-soft);
+    }
+    .icon-btn {
+      width: 36px;
+      height: 36px;
+      min-height: 36px;
+      padding: 0;
+      border-radius: 10px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-size: 16px;
+    }
+    .icon-btn:hover { border-color: var(--accent); background: var(--surface-2); transform: translateY(-1px); }
 
-    .notice { border-left: 4px solid #d4a32f; background: #fffbeb; padding: 12px 14px; border-radius: 6px; margin: 12px 0 16px; color: #4d4430; font-size: 13.5px; }
-    .notice.error { border-left-color: var(--red); background: #fef2f2; color: #7f1d1d; }
-    .notice.info { border-left-color: var(--blue); background: #eff6ff; color: #1e3a5f; }
+    /* Login Stage */
+    .login-stage {
+      min-height: calc(100vh - 64px);
+      display: grid;
+      place-items: center;
+      padding: 28px 18px;
+    }
+    .login-card {
+      width: 100%;
+      max-width: 440px;
+      background: var(--surface);
+      backdrop-filter: blur(20px);
+      border: 1px solid var(--border);
+      border-radius: 22px;
+      padding: 32px;
+      box-shadow: var(--shadow);
+      position: relative;
+      overflow: hidden;
+    }
+    .login-card::before {
+      content: "";
+      position: absolute;
+      inset: 0 0 auto 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--accent), var(--accent-2), #a855f7);
+    }
+    .pass-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      font: 700 11px var(--font-mono);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--accent);
+      background: rgba(16, 185, 129, 0.12);
+      border: 1px solid rgba(16, 185, 129, 0.28);
+      padding: 5px 10px;
+      border-radius: 999px;
+      margin-bottom: 14px;
+    }
+    .pass-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: pulse 2s infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .45; transform: scale(1.3); } }
 
-    fieldset { border: 0; border-top: 1px solid var(--line); margin: 0; padding: 18px 0 16px; }
-    fieldset:first-of-type { border-top: 0; padding-top: 0; }
-    legend { color: var(--navy); font-size: 16.5px; font-weight: 700; padding: 0 0 10px; }
+    .login-card h1 { font-size: 25px; font-weight: 800; letter-spacing: -0.03em; margin: 0 0 6px; }
+    .password-wrap { position: relative; }
+    .password-wrap input { padding-right: 44px; }
+    .toggle-pw {
+      position: absolute;
+      right: 6px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 32px;
+      height: 32px;
+      min-height: 32px;
+      padding: 0;
+      background: transparent;
+      border: 0;
+      color: var(--text-soft);
+      font-size: 15px;
+    }
+    .toggle-pw:hover { background: var(--surface-2); color: var(--text); transform: translateY(-50%); }
 
-    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 18px; }
+    /* Main App Container */
+    main { max-width: 1100px; margin: 26px auto 64px; padding: 0 18px; }
+
+    /* Modern Pill Tabs */
+    .tabs {
+      display: inline-flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      background: var(--surface);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border);
+      padding: 6px;
+      border-radius: 14px;
+      margin-bottom: 20px;
+    }
+    .tab-btn {
+      background: transparent;
+      color: var(--text-soft);
+      border: 0;
+      border-radius: 10px;
+      padding: 9px 16px;
+      font: 600 13.5px var(--font-sans);
+      cursor: pointer;
+      min-height: 38px;
+      transition: all .18s ease;
+    }
+    .tab-btn:hover:not(.active) { color: var(--text); background: var(--surface-2); }
+    .tab-btn.active {
+      background: linear-gradient(135deg, var(--accent), #0d9488);
+      color: #fff;
+      box-shadow: 0 6px 18px var(--accent-glow);
+    }
+
+    /* Cards & Notices */
+    .card {
+      background: var(--surface);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 24px;
+      box-shadow: var(--shadow);
+      margin-bottom: 18px;
+      animation: fadeUp .25s ease;
+    }
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+    h2 { font-size: 19px; font-weight: 800; letter-spacing: -0.02em; margin: 0 0 6px; }
+    .muted { color: var(--text-soft); font-size: 13.5px; margin: 0 0 16px; }
+
+    .notice {
+      border: 1px solid rgba(245, 158, 11, 0.35);
+      background: var(--warn-bg);
+      padding: 12px 15px;
+      border-radius: 12px;
+      margin: 12px 0 16px;
+      font-size: 13.5px;
+    }
+    .notice.error { border-color: rgba(244, 63, 94, 0.4); background: var(--danger-bg); color: var(--danger); }
+    .notice.info { border-color: rgba(56, 189, 248, 0.35); background: var(--info-bg); color: var(--text); }
+
+    /* Live Progress Banner */
+    .progress-box {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px 16px;
+      margin-bottom: 20px;
+      transition: border-color .2s ease;
+    }
+    .progress-box.ready { border-color: rgba(16, 185, 129, 0.5); background: rgba(16, 185, 129, 0.08); }
+    .progress-box.error { border-color: rgba(244, 63, 94, 0.5); background: var(--danger-bg); color: var(--danger); }
+    .progress-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+    .status-left { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 13.5px; }
+    .status-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--warn); flex: 0 0 auto; }
+    .progress-box.ready .status-dot { background: var(--accent); box-shadow: 0 0 10px var(--accent); }
+    .progress-box.error .status-dot { background: var(--danger); }
+    .progress-pct { font: 700 12px var(--font-mono); color: var(--accent); }
+    .progress-track { height: 6px; border-radius: 999px; background: var(--border); overflow: hidden; }
+    .progress-fill { height: 100%; width: 0%; border-radius: 999px; background: linear-gradient(90deg, var(--accent), var(--accent-2)); transition: width .25s ease; }
+
+    /* Fieldsets & Grid */
+    fieldset {
+      border: 0;
+      border-top: 1px solid var(--border);
+      margin: 0;
+      padding: 22px 0 18px;
+    }
+    fieldset:first-of-type { border-top: 0; padding-top: 4px; }
+    legend {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      padding: 0 0 14px;
+      color: var(--text);
+    }
+    .sec-num {
+      font: 700 11px var(--font-mono);
+      padding: 4px 8px;
+      border-radius: 7px;
+      background: rgba(16, 185, 129, 0.14);
+      color: var(--accent);
+      border: 1px solid rgba(16, 185, 129, 0.28);
+    }
+
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 20px; }
     .field { min-width: 0; }
     .field.full { grid-column: 1 / -1; }
-    label { display: block; font-weight: 600; margin: 0 0 5px; font-size: 13.5px; }
-    .req { color: var(--red); }
-    .help { display: block; color: var(--muted); font-size: 12px; margin-top: 4px; }
-    input, select, textarea { width: 100%; min-height: 40px; border: 1px solid #b8c5d1; border-radius: 7px; background: var(--input); padding: 8px 11px; color: var(--ink); font: inherit; }
-    input:focus, select:focus { outline: 3px solid rgba(36, 91, 134, .18); border-color: var(--blue); }
-    .checkline { display: flex; align-items: center; gap: 8px; margin-top: 7px; font-size: 13.5px; font-weight: 400; cursor: pointer; }
-    .checkline input { width: auto; min-height: 0; margin: 0; }
+    label { display: block; font-weight: 600; margin: 0 0 6px; font-size: 13px; color: var(--text); }
+    .req { color: var(--danger); }
+    .help { display: block; color: var(--text-soft); font-size: 12px; margin-top: 5px; }
 
-    .status { display: flex; align-items: center; gap: 10px; background: #f8fafc; border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; margin-bottom: 16px; font-size: 13.5px; }
-    .status-dot { width: 10px; height: 10px; border-radius: 50%; background: #d97706; flex: 0 0 auto; }
-    .status.ready .status-dot { background: var(--green); }
-    .status.ready { border-color: #bbf7d0; background: #f0fdf4; color: #166534; }
-    .status.error .status-dot { background: var(--red); }
-    .status.error { border-color: #fecaca; background: #fef2f2; color: var(--red); }
+    input, select, textarea {
+      width: 100%;
+      min-height: 43px;
+      border: 1px solid var(--border-strong);
+      border-radius: 10px;
+      background: var(--input-bg);
+      padding: 10px 13px;
+      color: var(--text);
+      font: 500 14px var(--font-sans);
+      transition: border-color .18s ease, box-shadow .18s ease;
+    }
+    input::placeholder { color: color-mix(in srgb, var(--text-soft) 68%, transparent); }
+    input:focus, select:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+    input[readonly] { opacity: .72; cursor: not-allowed; }
 
-    .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 14px; }
-    button, .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 0; border-radius: 8px; min-height: 42px; padding: 9px 16px; background: var(--navy); color: #fff; font: 600 14px inherit; text-decoration: none; cursor: pointer; }
-    button:hover, .btn:hover { background: #0f2d49; }
-    button:disabled { opacity: .6; cursor: wait; }
-    .btn-secondary { background: #e2e8f0; color: #1e293b; }
-    .btn-secondary:hover { background: #cbd5e1; }
-    .btn-danger { background: #fee2e2; color: #991b1b; }
-    .btn-danger:hover { background: #fecaca; }
-    .btn-sm { min-height: 32px; padding: 5px 10px; font-size: 12.5px; }
+    /* Interactive Radio Cards */
+    .radio-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 6px; }
+    .radio-card {
+      position: relative;
+      display: flex;
+      align-items: flex-start;
+      gap: 11px;
+      padding: 14px 16px;
+      border-radius: 12px;
+      border: 1px solid var(--border-strong);
+      background: var(--input-bg);
+      cursor: pointer;
+      transition: all .18s ease;
+      margin: 0;
+    }
+    .radio-card:hover { border-color: var(--accent-2); }
+    .radio-card.selected {
+      border-color: var(--accent);
+      background: rgba(16, 185, 129, 0.1);
+      box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+    .radio-card input { width: 17px; height: 17px; min-height: 0; margin: 2px 0 0; accent-color: var(--accent); flex: 0 0 auto; }
+    .radio-title { display: block; font-weight: 700; font-size: 13.5px; color: var(--text); }
+    .radio-desc { display: block; font-weight: 400; font-size: 12px; color: var(--text-soft); margin-top: 2px; }
 
+    .checkline { display: inline-flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 13px; font-weight: 500; color: var(--text-soft); cursor: pointer; }
+    .checkline input { width: 16px; height: 16px; min-height: 0; margin: 0; accent-color: var(--accent); }
+
+    /* Upload Dropzone */
+    .dropzone {
+      position: relative;
+      border: 1.5px dashed var(--border-strong);
+      border-radius: 14px;
+      background: var(--input-bg);
+      padding: 18px;
+      text-align: center;
+      transition: all .2s ease;
+      cursor: pointer;
+    }
+    .dropzone:hover, .dropzone.has-file { border-color: var(--accent); background: rgba(16, 185, 129, 0.06); }
+    .dropzone input[type="file"] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+      min-height: 0;
+      height: 100%;
+    }
+    .dz-title { font-weight: 700; font-size: 14px; color: var(--text); }
+    .dz-sub { font: 500 12px var(--font-mono); color: var(--text-soft); margin-top: 4px; }
+
+    /* Buttons */
+    .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 18px; }
+    button, .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      border: 1px solid transparent;
+      border-radius: 11px;
+      min-height: 44px;
+      padding: 10px 18px;
+      background: linear-gradient(135deg, var(--accent), #0d9488);
+      color: #fff;
+      font: 700 14px var(--font-sans);
+      text-decoration: none;
+      cursor: pointer;
+      transition: transform .15s ease, box-shadow .18s ease, opacity .18s ease;
+      box-shadow: 0 8px 22px var(--accent-glow);
+    }
+    button:hover, .btn:hover { transform: translateY(-1px); filter: brightness(1.06); }
+    button:active, .btn:active { transform: translateY(0); }
+    button:disabled { opacity: .55; cursor: wait; transform: none; }
+    .btn-secondary { background: var(--surface-2); color: var(--text); border-color: var(--border-strong); box-shadow: none; }
+    .btn-secondary:hover { border-color: var(--accent-2); filter: none; }
+    .btn-download { background: linear-gradient(135deg, #2563eb, #0284c7); box-shadow: 0 8px 22px rgba(37, 99, 235, 0.28); }
+    .btn-danger { background: var(--danger-bg); color: var(--danger); border-color: rgba(244, 63, 94, 0.3); box-shadow: none; }
+    .btn-danger:hover { background: rgba(244, 63, 94, 0.22); }
+    .btn-sm { min-height: 32px; padding: 5px 11px; font-size: 12px; border-radius: 8px; }
+
+    /* Tables */
+    .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; }
     table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
-    th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: middle; }
-    th { background: #f8fafc; color: var(--navy); font-weight: 700; }
-    code { background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-size: 12.5px; color: #0f172a; }
-    .tag-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px; margin-top: 10px; }
-    .tag-item { background: #f8fafc; border: 1px solid var(--line); border-radius: 6px; padding: 7px 10px; font-size: 12.5px; }
+    th, td { text-align: left; padding: 12px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    th { background: var(--surface-2); color: var(--text-soft); font: 700 11.5px var(--font-mono); text-transform: uppercase; letter-spacing: 0.06em; }
+    tr:last-child td { border-bottom: 0; }
+    tbody tr:hover td { background: color-mix(in srgb, var(--surface-2) 60%, transparent); }
+
+    code {
+      font-family: var(--font-mono);
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      padding: 2px 7px;
+      border-radius: 6px;
+      font-size: 12px;
+      color: var(--accent-2);
+    }
+
+    /* Clickable Tag Grid */
+    .tag-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(235px, 1fr)); gap: 9px; margin-top: 12px; }
+    .tag-item {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 12.5px;
+      cursor: pointer;
+      transition: all .16s ease;
+    }
+    .tag-item:hover { border-color: var(--accent); transform: translateY(-1px); background: rgba(16, 185, 129, 0.08); }
+    .tag-item code { display: inline-block; margin-bottom: 4px; color: var(--accent); background: rgba(16, 185, 129, 0.1); border-color: rgba(16, 185, 129, 0.25); }
+    .tag-item span { display: block; color: var(--text-soft); font-size: 12px; }
+
+    /* Floating Toast */
+    .toast {
+      position: fixed;
+      right: 22px;
+      bottom: 22px;
+      z-index: 90;
+      background: var(--surface-solid);
+      border: 1px solid var(--accent);
+      color: var(--text);
+      padding: 11px 16px;
+      border-radius: 12px;
+      font: 600 13px var(--font-sans);
+      box-shadow: 0 14px 35px rgba(0, 0, 0, 0.35);
+      opacity: 0;
+      transform: translateY(12px);
+      pointer-events: none;
+      transition: all .22s ease;
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
 
     @media (max-width: 720px) {
-      .grid { grid-template-columns: 1fr; }
-      table { display: block; overflow-x: auto; }
+      .grid, .radio-cards { grid-template-columns: 1fr; }
+      .topbar { padding: 12px 14px; }
+      .card { padding: 18px; }
+      .tabs { width: 100%; }
+      .tab-btn { flex: 1 1 auto; text-align: center; }
     }
   </style>
 </head>
 <body>
 
-<div class="topbar">
+<header class="topbar">
   <div class="brand">
-    <span>📄 Sistem Kontrak Mitra A</span>
+    <div class="brand-icon">⚡</div>
+    <div>
+      <div>Kontrak Mitra A</div>
+      <span class="brand-sub">PT Global Yimi Cargo • Cloud Studio</span>
+    </div>
+  </div>
+  <div class="top-right">
     <span id="activeTplBadge" class="badge hidden">Memuat template...</span>
+    <button type="button" id="themeToggle" class="icon-btn" title="Ganti Tema Gelap / Terang">☀️</button>
+    <div id="userBar" class="user-bar hidden">
+      <span id="userEmail" class="user-pill"></span>
+      <button type="button" id="logoutBtn" class="btn-secondary btn-sm">Keluar</button>
+    </div>
   </div>
-  <div id="userBar" class="user-bar hidden">
-    <span id="userEmail"></span>
-    <button type="button" id="logoutBtn">Keluar</button>
-  </div>
-</div>
+</header>
 
 <!-- LOGIN VIEW -->
-<section id="loginSection" class="login-wrap">
-  <div class="card">
-    <h2>Masuk ke Sistem Kontrak</h2>
-    <p class="muted">Gunakan akun tim yang terdaftar untuk mengakses template dan riwayat kontrak.</p>
+<section id="loginSection" class="login-stage">
+  <div class="login-card">
+    <div class="pass-chip"><span class="pass-dot"></span> INTERNAL ACCESS PASS</div>
+    <h1>Masuk ke Workspace</h1>
+    <p class="muted">Akses kontrak acuan terbaru, generator dwibahasa, dan riwayat dokumen tim.</p>
+
     <div id="configWarning" class="notice error hidden">
-      <strong>Belum terhubung ke Supabase!</strong> Edit file <code>index.html</code> dan isi <code>SUPABASE_URL</code> serta <code>SUPABASE_ANON_KEY</code> terlebih dahulu.
+      <strong>Belum terhubung ke Supabase!</strong> Edit file <code>index.html</code> dan isi <code>SUPABASE_URL</code> serta <code>SUPABASE_ANON_KEY</code>.
     </div>
     <div id="loginError" class="notice error hidden"></div>
+
     <form id="loginForm">
-      <div class="field" style="margin-bottom:12px;">
-        <label for="loginEmail">Email</label>
-        <input id="loginEmail" type="email" required autocomplete="username">
-      </div>
       <div class="field" style="margin-bottom:14px;">
-        <label for="loginPassword">Password</label>
-        <input id="loginPassword" type="password" required autocomplete="current-password">
+        <label for="loginEmail">Email Tim</label>
+        <input id="loginEmail" type="email" placeholder="nama@domain.com" required autocomplete="username">
       </div>
-      <button type="submit" id="loginBtn" style="width:100%;">Masuk</button>
+      <div class="field" style="margin-bottom:18px;">
+        <label for="loginPassword">Password</label>
+        <div class="password-wrap">
+          <input id="loginPassword" type="password" placeholder="••••••••" required autocomplete="current-password">
+          <button type="button" id="togglePwBtn" class="toggle-pw" aria-label="Lihat password">👁️</button>
+        </div>
+      </div>
+      <button type="submit" id="loginBtn" style="width:100%;">Masuk Workspace →</button>
     </form>
   </div>
 </section>
 
 <!-- APP VIEW -->
 <main id="appSection" class="hidden">
-  <div class="tabs">
-    <button type="button" class="tab-btn active" data-tab="tabForm">📝 Buat Kontrak</button>
+  <nav class="tabs" aria-label="Menu Utama">
+    <button type="button" class="tab-btn active" data-tab="tabForm">⚡ Buat Kontrak</button>
     <button type="button" class="tab-btn" data-tab="tabTemplates">📂 Kontrak Acuan</button>
     <button type="button" class="tab-btn" data-tab="tabSettings">⚙️ Pihak Pertama &amp; Denda</button>
-    <button type="button" class="tab-btn" data-tab="tabHistory">🗂️ Riwayat Kontrak</button>
-  </div>
+    <button type="button" class="tab-btn" data-tab="tabHistory">🗂️ Riwayat</button>
+  </nav>
 
   <!-- TAB 1: FORM KONTRAK -->
   <section id="tabForm" class="tab-panel">
     <div class="card">
       <div id="dbErrorAlert" class="notice error hidden"></div>
       <div id="noTemplateAlert" class="notice error hidden">
-        <strong>Belum ada Kontrak Acuan aktif!</strong> Buka tab <strong>📂 Kontrak Acuan</strong> untuk meng-upload file <code>.docx</code> pertama kali.
+        <strong>Belum ada Kontrak Acuan aktif!</strong> Buka tab <strong>📂 Kontrak Acuan</strong> untuk upload file <code>.docx</code> pertama kali.
       </div>
       <div id="activeTemplateInfo" class="notice info hidden"></div>
-      <div id="status" class="status"><span class="status-dot"></span><span id="statusText">Lengkapi kolom wajib untuk membuat kontrak.</span></div>
+
+      <div id="status" class="progress-box">
+        <div class="progress-top">
+          <div class="status-left"><span class="status-dot"></span><span id="statusText">Lengkapi kolom wajib untuk membuat kontrak.</span></div>
+          <span id="progressPct" class="progress-pct">0%</span>
+        </div>
+        <div class="progress-track"><div id="progressFill" class="progress-fill"></div></div>
+      </div>
 
       <form id="contractForm" novalidate>
         <fieldset>
-          <legend>Perjanjian</legend>
+          <legend><span class="sec-num">01</span> Info Perjanjian</legend>
           <div class="grid">
             <div class="field">
               <label for="agreement_no">Nomor perjanjian <span class="req">*</span></label>
@@ -163,7 +594,7 @@
             <div class="field">
               <label for="signing_date">Tanggal penandatanganan <span class="req">*</span></label>
               <input id="signing_date" name="signing_date" type="date" required>
-              <span class="help">Hari &amp; tanggal Inggris/Indonesia otomatis dibuat dari sini.</span>
+              <span class="help">Hari &amp; tanggal Inggris/Indonesia digenerate otomatis.</span>
             </div>
             <div class="field full">
               <label for="signing_location">Tempat penandatanganan <span class="req">*</span></label>
@@ -173,38 +604,37 @@
         </fieldset>
 
         <fieldset>
-          <legend>Mitra Perorangan / Pihak Kedua</legend>
+          <legend><span class="sec-num">02</span> Mitra Perorangan / Pihak Kedua</legend>
           <div class="grid">
             <div class="field">
               <label for="partner_name">Nama mitra sesuai KTP <span class="req">*</span></label>
-              <input id="partner_name" name="partner_name" required>
+              <input id="partner_name" name="partner_name" placeholder="Nama lengkap sesuai KTP" required>
             </div>
             <div class="field">
-              <label for="partner_nik">NIK mitra sesuai KTP (16 digit) <span class="req">*</span></label>
-              <input id="partner_nik" name="partner_nik" type="text" inputmode="numeric" pattern="[0-9]{16}" minlength="16" maxlength="16" required>
+              <label for="partner_nik">NIK sesuai KTP (16 digit) <span class="req">*</span></label>
+              <input id="partner_nik" name="partner_nik" type="text" inputmode="numeric" pattern="[0-9]{16}" minlength="16" maxlength="16" placeholder="1371xxxxxxxxxxxx" required>
             </div>
             <div class="field full">
               <label for="partner_address">Alamat lengkap sesuai KTP <span class="req">*</span></label>
-              <input id="partner_address" name="partner_address" required>
+              <input id="partner_address" name="partner_address" placeholder="Alamat lengkap sesuai KTP" required>
             </div>
             <div class="field">
               <label for="partner_code">Kode mitra <span class="req">*</span></label>
-              <input id="partner_code" name="partner_code" required>
+              <input id="partner_code" name="partner_code" placeholder="Contoh: PDG001" required>
             </div>
             <div class="field">
               <label for="operating_area">Area operasional <span class="req">*</span></label>
-              <input id="operating_area" name="operating_area" required>
+              <input id="operating_area" name="operating_area" placeholder="Contoh: Kec. Koto Tangah, Padang" required>
             </div>
             <div class="field full">
               <label for="partner_description">Uraian mitra setelah kode <span class="req">*</span></label>
-              <input id="partner_description" name="partner_description" required>
-              <span class="help">Mengisi "is ..." dan "merupakan ..." di kedua bahasa.</span>
+              <input id="partner_description" name="partner_description" placeholder="Dipakai pada 'is ...' &amp; 'merupakan ...'" required>
             </div>
           </div>
         </fieldset>
 
         <fieldset>
-          <legend>Kontak Korespondensi Mitra — Pasal 11</legend>
+          <legend><span class="sec-num">03</span> Kontak Korespondensi — Pasal 11</legend>
           <div class="grid">
             <div class="field">
               <label for="second_party_notice_attention">Untuk perhatian / PIC <span class="req">*</span></label>
@@ -220,51 +650,65 @@
               <label class="checkline"><input type="checkbox" id="second_party_notice_address_same"> Sama dengan alamat KTP mitra</label>
             </div>
             <div class="field">
-              <label for="second_party_notice_mobile">Nomor telepon seluler <span class="req">*</span></label>
-              <input id="second_party_notice_mobile" name="second_party_notice_mobile" type="tel" required>
+              <label for="second_party_notice_mobile">Nomor HP / WhatsApp <span class="req">*</span></label>
+              <input id="second_party_notice_mobile" name="second_party_notice_mobile" type="tel" placeholder="08xxxxxxxxxx" required>
             </div>
             <div class="field">
               <label for="second_party_notice_email">Email <span class="req">*</span></label>
-              <input id="second_party_notice_email" name="second_party_notice_email" type="email" required>
+              <input id="second_party_notice_email" name="second_party_notice_email" type="email" placeholder="mitra@email.com" required>
             </div>
           </div>
         </fieldset>
 
         <fieldset>
-          <legend>Biaya &amp; Skema Deposit</legend>
-          <div class="field full" style="margin-bottom:14px;">
+          <legend><span class="sec-num">04</span> Biaya &amp; Skema Deposit</legend>
+          <div class="field full" style="margin-bottom:16px;">
             <label>Skema pembayaran biaya deposit <span class="req">*</span></label>
-            <label class="checkline"><input type="radio" name="deposit_payment_option" value="full" required> Opsi 1 — Dibayar penuh/lunas sekaligus sebelum operasional</label>
-            <label class="checkline"><input type="radio" name="deposit_payment_option" value="installment"> Opsi 2 — Dicicil melalui pemotongan akun JFS</label>
+            <div class="radio-cards">
+              <label class="radio-card" data-radio-card="full">
+                <input type="radio" name="deposit_payment_option" value="full" required>
+                <div>
+                  <span class="radio-title">Opsi 1 — Lunas Sekaligus</span>
+                  <span class="radio-desc">Dibayar penuh di muka sebelum mulai operasional.</span>
+                </div>
+              </label>
+              <label class="radio-card" data-radio-card="installment">
+                <input type="radio" name="deposit_payment_option" value="installment">
+                <div>
+                  <span class="radio-title">Opsi 2 — Angsuran Akun JFS</span>
+                  <span class="radio-desc">DP di awal + pemotongan bulanan lewat saldo JFS.</span>
+                </div>
+              </label>
+            </div>
           </div>
           <div class="grid">
             <div class="field">
               <label for="material_fee_idr">Biaya material (Rp) <span class="req">*</span></label>
-              <input id="material_fee_idr" name="material_fee_idr" type="number" min="0" step="1" required>
+              <input id="material_fee_idr" name="material_fee_idr" type="number" min="0" step="1" placeholder="Angka bulat tanpa titik" required>
             </div>
             <div class="field">
               <label for="deposit_fee_idr">Total biaya deposit (Rp) <span class="req">*</span></label>
-              <input id="deposit_fee_idr" name="deposit_fee_idr" type="number" min="0" step="1" required>
+              <input id="deposit_fee_idr" name="deposit_fee_idr" type="number" min="0" step="1" placeholder="Angka bulat tanpa titik" required>
             </div>
             <div class="field">
               <label for="branding_fee_idr">Biaya branding (Rp) <span class="req">*</span></label>
-              <input id="branding_fee_idr" name="branding_fee_idr" type="number" min="0" step="1" required>
+              <input id="branding_fee_idr" name="branding_fee_idr" type="number" min="0" step="1" placeholder="Angka bulat tanpa titik" required>
             </div>
             <div id="installmentFields" class="grid field full hidden">
               <div class="field">
                 <label for="deposit_first_payment_idr">Pembayaran deposit pertama (Rp) <span class="req">*</span></label>
-                <input id="deposit_first_payment_idr" name="deposit_first_payment_idr" type="number" min="0" step="1">
+                <input id="deposit_first_payment_idr" name="deposit_first_payment_idr" type="number" min="0" step="1" placeholder="DP pertama">
               </div>
               <div class="field">
                 <label for="deposit_monthly_installment_idr">Angsuran deposit bulanan (Rp) <span class="req">*</span></label>
-                <input id="deposit_monthly_installment_idr" name="deposit_monthly_installment_idr" type="number" min="0" step="1">
+                <input id="deposit_monthly_installment_idr" name="deposit_monthly_installment_idr" type="number" min="0" step="1" placeholder="Cicilan per bulan">
               </div>
             </div>
           </div>
         </fieldset>
 
         <fieldset>
-          <legend>Jangka Waktu</legend>
+          <legend><span class="sec-num">05</span> Jangka Waktu</legend>
           <div class="grid">
             <div class="field">
               <label for="term_years">Lama perjanjian (tahun) <span class="req">*</span></label>
@@ -283,15 +727,15 @@
 
         <!-- AUTO-DETECTED CUSTOM TAGS FROM DYNAMIC DOCX -->
         <fieldset id="customFieldsSection" class="hidden">
-          <legend>✨ Kolom Tambahan (Auto-Detect dari Kontrak Acuan)</legend>
+          <legend><span class="sec-num">✨</span> Kolom Tambahan (Auto-Detect)</legend>
           <p class="muted">Kolom di bawah muncul otomatis karena terdeteksi sebagai tag baru di file DOCX acuan aktif.</p>
           <div id="customFieldsContainer" class="grid"></div>
         </fieldset>
 
         <div class="actions">
           <button id="generateButton" type="submit">⚡ Buat &amp; Simpan Kontrak DOCX</button>
-          <button id="clearButton" type="button" class="btn-secondary">Kosongkan Form</button>
-          <a id="downloadLink" class="btn hidden" style="background:#15803d;" href="#" download>⬇️ Unduh Kontrak DOCX</a>
+          <button id="clearButton" type="button" class="btn-secondary">Reset Form</button>
+          <a id="downloadLink" class="btn btn-download hidden" href="#" download>⬇️ Unduh Kontrak DOCX</a>
         </div>
       </form>
     </div>
@@ -300,18 +744,22 @@
   <!-- TAB 2: KONTRAK ACUAN (TEMPLATE) -->
   <section id="tabTemplates" class="tab-panel hidden">
     <div class="card">
-      <h2>Upload Kontrak Acuan Baru (.docx)</h2>
-      <p class="muted">Setiap kali kontrak acuan berubah, upload file <code>.docx</code> baru di sini. Semua laptop yang membuka link ini otomatis memakai acuan terbaru.</p>
+      <h2>Upload Kontrak Acuan Baru</h2>
+      <p class="muted">Submit file <code>.docx</code> baru di sini kapan pun ada revisi. Semua laptop yang membuka link ini otomatis sinkron pakai versi terbaru.</p>
       <div id="tplStatus" class="notice info hidden"></div>
       <form id="uploadTemplateForm">
         <div class="grid">
-          <div class="field">
+          <div class="field full">
             <label for="tplName">Nama / Versi Kontrak Acuan <span class="req">*</span></label>
             <input id="tplName" placeholder="Contoh: Kontrak Mitra A Revisi Nov 2026" required>
           </div>
-          <div class="field">
-            <label for="tplFile">File Microsoft Word (.docx) <span class="req">*</span></label>
-            <input id="tplFile" type="file" accept=".docx" required>
+          <div class="field full">
+            <label>File Microsoft Word (.docx) <span class="req">*</span></label>
+            <div class="dropzone" id="dropzoneBox">
+              <input id="tplFile" type="file" accept=".docx" required>
+              <div class="dz-title" id="dzTitle">📄 Klik atau tarik file .docx ke sini</div>
+              <div class="dz-sub" id="dzSub">Otomatis mendeteksi Mode LEGACY maupun Mode DINAMIS {{TAG}}</div>
+            </div>
           </div>
         </div>
         <div class="actions">
@@ -322,21 +770,23 @@
 
     <div class="card">
       <h2>Daftar Versi Kontrak Acuan</h2>
-      <table>
-        <thead>
-          <tr><th>Nama Acuan</th><th>Mode</th><th>Tag Tambahan</th><th>Tanggal</th><th>Aksi</th></tr>
-        </thead>
-        <tbody id="templatesTableBody">
-          <tr><td colspan="5" class="muted">Memuat daftar template...</td></tr>
-        </tbody>
-      </table>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Nama Acuan</th><th>Mode</th><th>Tag Baru</th><th>Tanggal</th><th>Aksi</th></tr>
+          </thead>
+          <tbody id="templatesTableBody">
+            <tr><td colspan="5" class="muted">Memuat daftar template...</td></tr>
+          </tbody>
+        </table>
+      </div>
     </div>
 
     <div class="card">
-      <h2>📖 Kamus Tag untuk Kontrak Acuan Baru (Mode Dinamis)</h2>
-      <p class="muted">Saat Legal mengirim revisi kontrak baru, cukup pasang tag <code>{{NAMA_TAG}}</code> di dalam file Word. Jika butuh kolom baru di luar daftar ini (misal <code>{{NPWP_MITRA}}</code>), langsung ketik saja—web app otomatis membuatkan kolom inputnya!</p>
+      <h2>📖 Kamus Tag Dinamis (Klik untuk Copy)</h2>
+      <p class="muted">Untuk revisi kontrak acuan ke depan, pasang tag di bawah di dalam Word. Butuh kolom baru (misal <code>{{NPWP_MITRA}}</code>)? Langsung ketik aja—form otomatis nambahin kolomnya!</p>
       <div class="notice">
-        <strong>Blok Opsi Deposit Kondisional:</strong> Bungkus paragraf khusus Lunas dengan <code>{{#OPSI_LUNAS}} ... {{/OPSI_LUNAS}}</code> dan paragraf khusus Cicilan JFS dengan <code>{{#OPSI_CICILAN}} ... {{/OPSI_CICILAN}}</code>.
+        <strong>Blok Opsi Deposit Kondisional:</strong> Bungkus paragraf khusus Lunas dengan <code>{{#OPSI_LUNAS}} ... {{/OPSI_LUNAS}}</code> dan khusus Cicilan JFS dengan <code>{{#OPSI_CICILAN}} ... {{/OPSI_CICILAN}}</code>.
       </div>
       <div class="tag-grid" id="tagCheatSheet"></div>
     </div>
@@ -345,12 +795,12 @@
   <!-- TAB 3: PENGATURAN PIHAK PERTAMA & DENDA -->
   <section id="tabSettings" class="tab-panel hidden">
     <div class="card">
-      <h2>Pengaturan Data Pihak Pertama &amp; Denda Tetap</h2>
-      <p class="muted">Perubahan di sini tersimpan di cloud dan otomatis berlaku untuk semua kontrak baru di semua laptop.</p>
+      <h2>Pengaturan Pihak Pertama &amp; Denda Tetap</h2>
+      <p class="muted">Edit sekali di sini, langsung ke-update di semua laptop untuk setiap kontrak baru.</p>
       <div id="settingsStatus" class="notice info hidden"></div>
       <form id="settingsForm">
         <fieldset>
-          <legend>Data Pihak Pertama</legend>
+          <legend><span class="sec-num">01</span> Identitas Pihak Pertama</legend>
           <div class="grid">
             <div class="field"><label for="set_pt">Nama PT (tanpa "PT")</label><input id="set_pt" required></div>
             <div class="field"><label for="set_area">Area / Cabang</label><input id="set_area" required></div>
@@ -363,7 +813,7 @@
           </div>
         </fieldset>
         <fieldset>
-          <legend>Denda Tetap (Otomatis Terbilang ID &amp; EN)</legend>
+          <legend><span class="sec-num">02</span> Nominal Denda Tetap</legend>
           <div class="grid">
             <div class="field"><label for="set_pen_transfer">Denda Pengalihan Kewajiban (Rp)</label><input id="set_pen_transfer" type="number" min="0" required></div>
             <div class="field"><label for="set_pen_brand">Denda Penggunaan Merek/Agen Lain (Rp)</label><input id="set_pen_brand" type="number" min="0" required></div>
@@ -373,7 +823,7 @@
           </div>
         </fieldset>
         <div class="actions">
-          <button type="submit" id="saveSettingsBtn">💾 Simpan Pengaturan</button>
+          <button type="submit" id="saveSettingsBtn">💾 Simpan ke Cloud</button>
         </div>
       </form>
     </div>
@@ -382,28 +832,32 @@
   <!-- TAB 4: RIWAYAT KONTRAK -->
   <section id="tabHistory" class="tab-panel hidden">
     <div class="card">
-      <h2>Riwayat Kontrak Dibuat</h2>
-      <p class="muted">Klik <strong>Muat ke Form</strong> jika ingin merevisi typo atau membuat ulang kontrak tanpa mengetik dari awal.</p>
-      <div class="field" style="max-width:340px; margin-bottom:14px;">
-        <input id="historySearch" placeholder="🔍 Cari nama mitra / no kontrak / kode...">
+      <h2>Riwayat Kontrak</h2>
+      <p class="muted">Klik <strong>Muat ke Form</strong> untuk merevisi typo atau bikin ulang tanpa ngetik dari nol.</p>
+      <div class="field" style="max-width:360px; margin-bottom:16px;">
+        <input id="historySearch" placeholder="🔍 Cari nama mitra, nomor kontrak, atau kode...">
       </div>
-      <table>
-        <thead>
-          <tr><th>Tanggal</th><th>No. Perjanjian</th><th>Nama Mitra</th><th>Kode</th><th>Aksi</th></tr>
-        </thead>
-        <tbody id="historyTableBody">
-          <tr><td colspan="5" class="muted">Memuat riwayat...</td></tr>
-        </tbody>
-      </table>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Tanggal</th><th>No. Perjanjian</th><th>Nama Mitra</th><th>Kode</th><th>Aksi</th></tr>
+          </thead>
+          <tbody id="historyTableBody">
+            <tr><td colspan="5" class="muted">Memuat riwayat...</td></tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   </section>
 </main>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
 
 <script>
 "use strict";
 
 // =====================================================================
-// KONFIGURASI SUPABASE (SUDAH TERHUBUNG KE PROJECT KONTRAK MITRA A)
+// KONFIGURASI SUPABASE
 // =====================================================================
 const SUPABASE_URL = "https://lpjkhihdarlehixoskht.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_Cma34qB6pdFN6VveEY51Zw_uU_3-kJp";
@@ -483,23 +937,58 @@ const BUILTIN_TAGS = {
   PENALTY_AFFILIATE_EN: "Sanksi Afiliasi (EN)"
 };
 
-// State Aplikasi
 let currentUser = null;
 let appSettings = { first_party: {}, fixed_penalties: {} };
 let templatesList = [];
 let activeTemplate = null;
 let historyList = [];
 let currentObjectUrl = null;
+let toastTimer = null;
 
 // =====================================================================
-// HELPER FORMATTER & TERBILANG DWIBAHASA
+// HELPER UI & FORMATTER
 // =====================================================================
 const $ = (id) => document.getElementById(id);
+function showToast(msg) {
+  const t = $("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove("show"), 2600);
+}
 function esc(s) { return String(s ?? "").replace(/[&<>"']/g, m => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[m])); }
 function safeName(text) { return String(text || "File").normalize("NFKD").replace(/[^A-Za-z0-9_-]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 64) || "Mitra"; }
 function moneyText(n) { return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, "."); }
 function dateEn(d) { return `${d.getUTCDate()} ${MONTHS_EN[d.getUTCMonth()]} ${d.getUTCFullYear()}`; }
 function dateId(d) { return `${d.getUTCDate()} ${MONTHS_ID[d.getUTCMonth()]} ${d.getUTCFullYear()}`; }
+
+// Theme switcher
+function applyTheme(theme) {
+  document.documentElement.setAttribute("data-theme", theme);
+  $("themeToggle").textContent = theme === "dark" ? "☀️" : "🌙";
+  localStorage.setItem("kontrak_theme", theme);
+}
+applyTheme(localStorage.getItem("kontrak_theme") || "dark");
+$("themeToggle").addEventListener("click", () => {
+  const cur = document.documentElement.getAttribute("data-theme");
+  applyTheme(cur === "dark" ? "light" : "dark");
+});
+
+// Password visibility toggle
+$("togglePwBtn").addEventListener("click", () => {
+  const pw = $("loginPassword");
+  const isHidden = pw.type === "password";
+  pw.type = isHidden ? "text" : "password";
+  $("togglePwBtn").textContent = isHidden ? "🙈" : "👁️";
+});
+
+// Dropzone file label
+$("tplFile").addEventListener("change", () => {
+  const f = $("tplFile").files[0];
+  $("dropzoneBox").classList.toggle("has-file", Boolean(f));
+  $("dzTitle").textContent = f ? `✅ ${f.name}` : "📄 Klik atau tarik file .docx ke sini";
+  $("dzSub").textContent = f ? `Ukuran: ${(f.size / 1024).toFixed(1)} KB — siap di-upload` : "Otomatis mendeteksi Mode LEGACY maupun Mode DINAMIS {{TAG}}";
+});
 
 function below1000Id(n) {
   const w = ["nol","satu","dua","tiga","empat","lima","enam","tujuh","delapan","sembilan"];
@@ -545,7 +1034,7 @@ function wordsEn(n) {
 }
 
 // =====================================================================
-// XML / DOCX CORE HELPERS (Mempertahankan Format Bold/Font Word)
+// XML / DOCX CORE HELPERS
 // =====================================================================
 function textNodes(p) { return [...p.getElementsByTagNameNS(WORD_NS, "t")]; }
 function paragraphText(p) { return textNodes(p).map(n => n.textContent || "").join(""); }
@@ -579,7 +1068,7 @@ function replaceSpan(nodes, start, end, value) {
 }
 
 // =====================================================================
-// SCANNER TEMPLATE DOCX (Auto-Detect Mode Dinamis vs Legacy)
+// SCANNER TEMPLATE DOCX
 // =====================================================================
 async function inspectDocxFile(file) {
   const zip = await JSZip.loadAsync(file);
@@ -759,7 +1248,7 @@ async function generateDynamicDocx(zip, v) {
 }
 
 // =====================================================================
-// ENGINE 2: LEGACY COMPATIBILITY (Untuk Template Kontrak Mitra A Saat Ini)
+// ENGINE 2: LEGACY COMPATIBILITY
 // =====================================================================
 function appendContactValueLegacy(p, value, contactIndexes) {
   const label = paragraphText(p).trim().replace(/\s+/g, " ").toLowerCase();
@@ -867,524 +1356,4 @@ function replaceParagraphLegacy(p, v, signatureIndex, contactIndexes) {
   } else if (low.includes("subsequent installment payments") || low.includes("pembayaran angsuran selanjutnya")) {
     const n = v.deposit_monthly_installment_idr_value;
     add("\\[x\\]", moneyText(n));
-    add("\\(masukkan bilangan\\)", low.includes("subsequent installment") ? wordsEn(n) : wordsId(n));
-  }
-  if (low.includes("starting from") && low.includes("may be extended")) seq("\\[date\\s*/\\s*month\\s*/\\s*year\\]", [dateEn(v.effective_start_date_value), dateEn(v.effective_end_date_value)]);
-  if (low.includes("terhitung efektif sejak") && low.includes("dapat diperpanjang")) seq("\\[tanggal\\s*/\\s*bulan\\s*/\\s*tahun\\]", [dateId(v.effective_start_date_value), dateId(v.effective_end_date_value)]);
-  if (low.includes("term of this agreement is")) add("\\b1\\s*\\(one\\)\\s*year\\b", `${v.term_years_value} (${wordsEn(v.term_years_value)}) year`);
-  if (low.includes("jangka waktu perjanjian adalah selama")) add("\\b1\\s*\\(satu\\)\\s*tahun\\b", `${v.term_years_value} (${wordsId(v.term_years_value)}) tahun`);
-
-  if (!repls.length) return;
-  repls.sort((a, b) => b[0] - a[0]);
-  for (const [start, end, val] of repls) replaceSpan(nodes, start, end, String(val));
-}
-
-async function generateLegacyDocx(zip, v) {
-  const parts = Object.keys(zip.files).filter(n => n === "word/document.xml" || /^word\/(header|footer)\d+\.xml$/.test(n));
-  const signatureIndex = { value: 0 }, contactIndexes = {}, numberOverrides = [];
-
-  for (const part of parts) {
-    const xml = await zip.file(part).async("string");
-    const doc = new DOMParser().parseFromString(xml, "application/xml");
-    if (part === "word/document.xml") {
-      const groups = new Map();
-      for (const p of doc.getElementsByTagNameNS(WORD_NS, "p")) {
-        let cell = p.parentNode;
-        while (cell && !(cell.namespaceURI === WORD_NS && cell.localName === "tc")) cell = cell.parentNode;
-        if (cell) { if (!groups.has(cell)) groups.set(cell, []); groups.get(cell).push(p); }
-      }
-      const full = v.deposit_payment_option === "full";
-      for (const paragraphs of groups.values()) {
-        const texts = paragraphs.map(p => paragraphText(p).trim());
-        const fullIdx = texts.findIndex(t => t.toLowerCase().startsWith("full payment in a single, upfront lump sum") || t.toLowerCase().startsWith("pembayaran dilakukan secara penuh (lunas)"));
-        const instIdx = texts.findIndex(t => t.toLowerCase().startsWith("payment may also be made through monthly deductions") || t.toLowerCase().startsWith("pembayaran dilakukan melalui pemotongan akun jfs"));
-        if (fullIdx < 0 || instIdx < 0) continue;
-        let remove = [];
-        if (full) {
-          const endIdx = texts.findIndex((t, i) => i > instIdx && (t.toLowerCase().startsWith("for the avoidance of doubt") || t.toLowerCase().startsWith("untuk menghindari keraguan")));
-          if (endIdx > instIdx) remove = paragraphs.slice(fullIdx + 1, endIdx + 1);
-        } else {
-          const optP = paragraphs[instIdx];
-          const numId = optP.getElementsByTagNameNS(WORD_NS, "numId")[0];
-          const ilvl = optP.getElementsByTagNameNS(WORD_NS, "ilvl")[0];
-          if (numId && ilvl) numberOverrides.push({ numId: numId.getAttributeNS(WORD_NS, "val"), ilvl: ilvl.getAttributeNS(WORD_NS, "val") || "0" });
-          remove = paragraphs.slice(fullIdx, instIdx);
-        }
-        for (const p of remove) p.parentNode.removeChild(p);
-      }
-      if (full) {
-        for (const p of [...doc.getElementsByTagNameNS(WORD_NS, "p")]) {
-          const t = paragraphText(p).toLowerCase();
-          if (t.includes("fails make installment payments of the deposit fee") || t.includes("tidak melakukan angsuran pembayaran biaya deposit")) p.parentNode.removeChild(p);
-        }
-      }
-    }
-    for (const p of doc.getElementsByTagNameNS(WORD_NS, "p")) replaceParagraphLegacy(p, v, signatureIndex, contactIndexes);
-    zip.file(part, new XMLSerializer().serializeToString(doc));
-  }
-
-  if (numberOverrides.length && zip.file("word/numbering.xml")) {
-    const ndoc = new DOMParser().parseFromString(await zip.file("word/numbering.xml").async("string"), "application/xml");
-    for (const item of numberOverrides) {
-      const num = [...ndoc.getElementsByTagNameNS(WORD_NS, "num")].find(n => n.getAttributeNS(WORD_NS, "numId") === item.numId);
-      if (!num) continue;
-      let level = [...num.getElementsByTagNameNS(WORD_NS, "lvlOverride")].find(n => n.getAttributeNS(WORD_NS, "ilvl") === item.ilvl);
-      if (!level) { level = ndoc.createElementNS(WORD_NS, "w:lvlOverride"); level.setAttributeNS(WORD_NS, "w:ilvl", item.ilvl); num.appendChild(level); }
-      let start = level.getElementsByTagNameNS(WORD_NS, "startOverride")[0];
-      if (!start) { start = ndoc.createElementNS(WORD_NS, "w:startOverride"); level.appendChild(start); }
-      start.setAttributeNS(WORD_NS, "w:val", "2");
-    }
-    zip.file("word/numbering.xml", new XMLSerializer().serializeToString(ndoc));
-  }
-}
-
-// =====================================================================
-// SUPABASE DATA LOADERS & UI RENDERERS
-// =====================================================================
-async function loadAllData() {
-  const errBox = $("dbErrorAlert");
-  errBox.classList.add("hidden");
-
-  const [setRes, tplRes, histRes] = await Promise.all([
-    sb.from("app_settings").select("*").eq("id", 1).single(),
-    sb.from("contract_templates").select("*").order("created_at", { ascending: false }),
-    sb.from("contract_history").select("*").order("created_at", { ascending: false }).limit(100)
-  ]);
-
-  const firstErr = setRes.error || tplRes.error || histRes.error;
-  if (firstErr) {
-    errBox.innerHTML = `<strong>Gagal membaca database Supabase:</strong> ${esc(firstErr.message)}. Pastikan kode SQL setup sudah dijalankan di SQL Editor Supabase.`;
-    errBox.classList.remove("hidden");
-  }
-
-  if (setRes.data) { appSettings = setRes.data; populateSettingsForm(); }
-  templatesList = tplRes.data || [];
-  activeTemplate = templatesList.find(t => t.is_active) || null;
-  historyList = histRes.data || [];
-
-  renderActiveTemplateUI();
-  renderTemplatesTable();
-  renderHistoryTable();
-}
-
-function renderActiveTemplateUI() {
-  const badge = $("activeTplBadge");
-  const alertBox = $("noTemplateAlert");
-  const infoBox = $("activeTemplateInfo");
-  const customSec = $("customFieldsSection");
-  const customCont = $("customFieldsContainer");
-
-  if (!activeTemplate) {
-    badge.textContent = "Belum ada acuan";
-    badge.className = "badge";
-    badge.classList.remove("hidden");
-    alertBox.classList.remove("hidden");
-    infoBox.classList.add("hidden");
-    customSec.classList.add("hidden");
-    customCont.innerHTML = "";
-    return;
-  }
-
-  alertBox.classList.add("hidden");
-  badge.textContent = `Acuan: ${activeTemplate.name} (${activeTemplate.mode.toUpperCase()})`;
-  badge.className = `badge ${activeTemplate.mode}`;
-  badge.classList.remove("hidden");
-
-  infoBox.innerHTML = `<strong>Kontrak Acuan Aktif:</strong> ${esc(activeTemplate.name)} &nbsp;|&nbsp; Mode: <code>${esc(activeTemplate.mode.toUpperCase())}</code> &nbsp;|&nbsp; Pihak Pertama: <strong>PT ${esc(appSettings.first_party.first_party_pt_entity || "-")}</strong> (PIC: ${esc(appSettings.first_party.first_party_signatory || "-")})`;
-  infoBox.classList.remove("hidden");
-
-  const customTags = Array.isArray(activeTemplate.custom_tags) ? activeTemplate.custom_tags : [];
-  if (customTags.length > 0) {
-    customSec.classList.remove("hidden");
-    customCont.innerHTML = customTags.map(tag => `
-      <div class="field">
-        <label for="custom_${esc(tag)}">${esc(tag.replaceAll("_", " "))} <span class="req">*</span></label>
-        <input id="custom_${esc(tag)}" data-custom-tag="${esc(tag)}" required placeholder="Isi nilai untuk {{${esc(tag)}}}">
-      </div>
-    `).join("");
-  } else {
-    customSec.classList.add("hidden");
-    customCont.innerHTML = "";
-  }
-  updateProgress();
-}
-
-function renderTemplatesTable() {
-  const tbody = $("templatesTableBody");
-  if (!templatesList.length) {
-    tbody.innerHTML = `<tr><td colspan="5" class="muted">Belum ada kontrak acuan yang di-upload.</td></tr>`;
-    return;
-  }
-  tbody.innerHTML = templatesList.map(t => {
-    const dt = new Date(t.created_at).toLocaleString("id-ID");
-    const tags = (t.custom_tags || []).map(x => `<code>{{${esc(x)}}}</code>`).join(" ") || "-";
-    return `
-      <tr>
-        <td><strong>${esc(t.name)}</strong> ${t.is_active ? '<span class="badge dynamic">AKTIF</span>' : ""}</td>
-        <td><code>${esc(t.mode)}</code></td>
-        <td>${tags}</td>
-        <td>${esc(dt)}</td>
-        <td>
-          ${!t.is_active ? `<button type="button" class="btn-sm btn-secondary" onclick="activateTemplate('${t.id}')">Aktifkan</button>` : ""}
-          <button type="button" class="btn-sm btn-secondary" onclick="downloadTemplate('${esc(t.file_path)}','${esc(t.name)}')">Unduh</button>
-          <button type="button" class="btn-sm btn-danger" onclick="deleteTemplate('${t.id}','${esc(t.file_path)}')">Hapus</button>
-        </td>
-      </tr>`;
-  }).join("");
-}
-
-function renderHistoryTable(filter = "") {
-  const tbody = $("historyTableBody");
-  const q = filter.trim().toLowerCase();
-  const rows = historyList.filter(h => !q || `${h.agreement_no} ${h.partner_name} ${h.partner_code}`.toLowerCase().includes(q));
-  if (!rows.length) {
-    tbody.innerHTML = `<tr><td colspan="5" class="muted">Belum ada riwayat kontrak.</td></tr>`;
-    return;
-  }
-  tbody.innerHTML = rows.map(h => `
-    <tr>
-      <td>${esc(new Date(h.created_at).toLocaleString("id-ID"))}</td>
-      <td><code>${esc(h.agreement_no)}</code></td>
-      <td><strong>${esc(h.partner_name)}</strong></td>
-      <td>${esc(h.partner_code)}</td>
-      <td>
-        <button type="button" class="btn-sm btn-secondary" onclick="loadHistoryIntoForm('${h.id}')">Muat ke Form</button>
-        <button type="button" class="btn-sm btn-danger" onclick="deleteHistory('${h.id}')">Hapus</button>
-      </td>
-    </tr>`).join("");
-}
-
-function populateSettingsForm() {
-  const fp = appSettings.first_party || {}, pen = appSettings.fixed_penalties || {};
-  $("set_pt").value = fp.first_party_pt_entity || "";
-  $("set_area").value = fp.first_party_branch_area || "";
-  $("set_signatory").value = fp.first_party_signatory || "";
-  $("set_authorizer").value = fp.first_party_authorizer || "";
-  $("set_address").value = fp.first_party_address || "";
-  $("set_tel").value = fp.first_party_notice_telephone || "-";
-  $("set_mobile").value = fp.first_party_notice_mobile || "";
-  $("set_email").value = fp.first_party_notice_email || "";
-  $("set_pen_transfer").value = pen.transfer_penalty_fixed ?? 20000000;
-  $("set_pen_brand").value = pen.brand_penalty_fixed ?? 10000000;
-  $("set_pen_legality").value = pen.legality_penalty_fixed ?? 2000000;
-  $("set_pen_aff_id").value = pen.affiliate_penalty_id || "";
-  $("set_pen_aff_en").value = pen.affiliate_penalty_en || "";
-}
-
-// =====================================================================
-// AKSI TEMPLATE & RIWAYAT (GLOBAL HANDLERS)
-// =====================================================================
-window.activateTemplate = async (id) => {
-  await sb.from("contract_templates").update({ is_active: false }).neq("id", id);
-  await sb.from("contract_templates").update({ is_active: true }).eq("id", id);
-  await loadAllData();
-};
-window.downloadTemplate = async (path, name) => {
-  const { data, error } = await sb.storage.from("contract-templates").download(path);
-  if (error) return alert("Gagal mengunduh template: " + error.message);
-  const url = URL.createObjectURL(data);
-  const a = document.createElement("a"); a.href = url; a.download = `${safeName(name)}.docx`; a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 5000);
-};
-window.deleteTemplate = async (id, path) => {
-  if (!confirm("Hapus template acuan ini?")) return;
-  await sb.storage.from("contract-templates").remove([path]);
-  await sb.from("contract_templates").delete().eq("id", id);
-  await loadAllData();
-};
-window.deleteHistory = async (id) => {
-  if (!confirm("Hapus riwayat kontrak ini?")) return;
-  await sb.from("contract_history").delete().eq("id", id);
-  await loadAllData();
-};
-window.loadHistoryIntoForm = (id) => {
-  const row = historyList.find(h => h.id === id);
-  if (!row || !row.form_data) return;
-  const d = row.form_data;
-  for (const [k, val] of Object.entries(d)) {
-    if (k === "deposit_payment_option") {
-      const r = document.querySelector(`input[name="deposit_payment_option"][value="${val}"]`);
-      if (r) r.checked = true;
-    } else if (k === "custom_fields" && val && typeof val === "object") {
-      for (const [ck, cv] of Object.entries(val)) {
-        const el = $(`custom_${ck}`);
-        if (el) el.value = cv;
-      }
-    } else {
-      const el = $(k);
-      if (el) el.value = val ?? "";
-    }
-  }
-  setPaymentFields();
-  updateProgress();
-  switchTab("tabForm");
-  setStatus(`Data kontrak "${d.partner_name}" dimuat. Silakan ubah lalu klik Buat & Simpan Kontrak DOCX.`, "ready");
-};
-
-// =====================================================================
-// FORM VALIDATION & CONTRACT GENERATION
-// =====================================================================
-const form = $("contractForm");
-function setStatus(msg, kind = "") {
-  $("statusText").textContent = msg;
-  $("status").classList.toggle("ready", kind === "ready");
-  $("status").classList.toggle("error", kind === "error");
-}
-function valueOf(name) { return String(new FormData(form).get(name) ?? "").trim(); }
-function setPaymentFields() {
-  const inst = valueOf("deposit_payment_option") === "installment";
-  $("installmentFields").classList.toggle("hidden", !inst);
-  $("deposit_first_payment_idr").required = inst;
-  $("deposit_monthly_installment_idr").required = inst;
-}
-function syncNoticeAddress() {
-  const same = $("second_party_notice_address_same").checked;
-  const target = $("second_party_notice_address");
-  if (same) { target.value = $("partner_address").value; target.readOnly = true; }
-  else target.readOnly = false;
-}
-function updateProgress() {
-  const controls = [...form.querySelectorAll("input[required]")].filter(el => !el.closest(".hidden"));
-  const done = controls.filter(el => el.type === "radio" ? Boolean(form.querySelector(`input[name="${el.name}"]:checked`)) : el.value.trim() !== "").length;
-  if (done === controls.length) setStatus("Semua kolom wajib terisi. Siap membuat kontrak DOCX!", "ready");
-  else setStatus(`${done} dari ${controls.length} kolom wajib sudah diisi.`);
-}
-function parseDateUTC(raw, label) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) throw new Error(`${label} belum valid.`);
-  const [y, m, d] = raw.split("-").map(Number);
-  return new Date(Date.UTC(y, m - 1, d));
-}
-function parseIntStrict(raw, label, min = 0) {
-  if (raw === "") throw new Error(`${label} belum diisi.`);
-  const n = Number(raw);
-  if (!Number.isSafeInteger(n) || n < min) throw new Error(`${label} harus angka bulat minimal ${min}.`);
-  return n;
-}
-function collectFormValues() {
-  const v = {
-    agreement_no: valueOf("agreement_no").replace(/^\[([\s\S]*)\]$/, "$1").trim(),
-    signing_date: valueOf("signing_date"),
-    signing_location: valueOf("signing_location"),
-    partner_name: valueOf("partner_name"),
-    partner_nik: valueOf("partner_nik"),
-    partner_address: valueOf("partner_address"),
-    partner_code: valueOf("partner_code"),
-    partner_description: valueOf("partner_description"),
-    operating_area: valueOf("operating_area"),
-    second_party_notice_attention: valueOf("second_party_notice_attention"),
-    second_party_notice_telephone: valueOf("second_party_notice_telephone"),
-    second_party_notice_address: valueOf("second_party_notice_address"),
-    second_party_notice_mobile: valueOf("second_party_notice_mobile"),
-    second_party_notice_email: valueOf("second_party_notice_email"),
-    deposit_payment_option: valueOf("deposit_payment_option"),
-    material_fee_idr: valueOf("material_fee_idr"),
-    deposit_fee_idr: valueOf("deposit_fee_idr"),
-    branding_fee_idr: valueOf("branding_fee_idr"),
-    deposit_first_payment_idr: valueOf("deposit_first_payment_idr"),
-    deposit_monthly_installment_idr: valueOf("deposit_monthly_installment_idr"),
-    term_years: valueOf("term_years"),
-    effective_start_date: valueOf("effective_start_date"),
-    effective_end_date: valueOf("effective_end_date"),
-    custom_fields: {}
-  };
-  if (!v.agreement_no) throw new Error("Nomor perjanjian wajib diisi.");
-  if (!/^[0-9]{16}$/.test(v.partner_nik)) throw new Error("NIK mitra harus tepat 16 digit angka.");
-  if (!["full", "installment"].includes(v.deposit_payment_option)) throw new Error("Pilih salah satu skema deposit.");
-  v.signing_date_value = parseDateUTC(v.signing_date, "Tanggal penandatanganan");
-  v.effective_start_date_value = parseDateUTC(v.effective_start_date, "Tanggal mulai");
-  v.effective_end_date_value = parseDateUTC(v.effective_end_date, "Tanggal akhir");
-  if (v.effective_end_date_value <= v.effective_start_date_value) throw new Error("Tanggal akhir harus setelah tanggal mulai.");
-  v.term_years_value = parseIntStrict(v.term_years, "Lama perjanjian", 1);
-  v.material_fee_idr_value = parseIntStrict(v.material_fee_idr, "Biaya material");
-  v.deposit_fee_idr_value = parseIntStrict(v.deposit_fee_idr, "Total biaya deposit");
-  v.branding_fee_idr_value = parseIntStrict(v.branding_fee_idr, "Biaya branding");
-  if (v.deposit_payment_option === "installment") {
-    v.deposit_first_payment_idr_value = parseIntStrict(v.deposit_first_payment_idr, "Deposit pertama");
-    v.deposit_monthly_installment_idr_value = parseIntStrict(v.deposit_monthly_installment_idr, "Angsuran bulanan");
-  }
-  for (const el of document.querySelectorAll("[data-custom-tag]")) {
-    const val = el.value.trim();
-    if (!val) throw new Error(`Kolom tambahan "${el.dataset.customTag}" belum diisi.`);
-    v.custom_fields[el.dataset.customTag] = val;
-  }
-  return v;
-}
-
-form.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  $("downloadLink").classList.add("hidden");
-  if (!activeTemplate) return setStatus("Upload kontrak acuan terlebih dahulu di tab Kontrak Acuan.", "error");
-  if (!form.reportValidity()) return;
-
-  const btn = $("generateButton");
-  btn.disabled = true; btn.textContent = "Memproses DOCX...";
-  setStatus("Mengunduh template dari cloud & menyusun kontrak...");
-
-  try {
-    const v = collectFormValues();
-    const { data: tplBlob, error: dlErr } = await sb.storage.from("contract-templates").download(activeTemplate.file_path);
-    if (dlErr) throw new Error("Gagal mengambil template dari cloud: " + dlErr.message);
-
-    const zip = await JSZip.loadAsync(tplBlob);
-    if (activeTemplate.mode === "dynamic") await generateDynamicDocx(zip, v);
-    else await generateLegacyDocx(zip, v);
-
-    const outBlob = await zip.generateAsync({
-      type: "blob",
-      mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      compression: "DEFLATE"
-    });
-
-    // Simpan riwayat ke database Supabase
-    const savePayload = { ...v };
-    delete savePayload.signing_date_value; delete savePayload.effective_start_date_value; delete savePayload.effective_end_date_value;
-    await sb.from("contract_history").insert({
-      template_id: activeTemplate.id,
-      agreement_no: v.agreement_no,
-      partner_name: v.partner_name,
-      partner_code: v.partner_code,
-      form_data: savePayload,
-      created_by: currentUser.id
-    });
-
-    const d = v.signing_date_value;
-    const fileName = `Kontrak_MitraA_${safeName(v.partner_name)}_${d.getUTCFullYear()}${String(d.getUTCMonth()+1).padStart(2,"0")}${String(d.getUTCDate()).padStart(2,"0")}.docx`;
-    if (currentObjectUrl) URL.revokeObjectURL(currentObjectUrl);
-    currentObjectUrl = URL.createObjectURL(outBlob);
-    $("downloadLink").href = currentObjectUrl;
-    $("downloadLink").download = fileName;
-    $("downloadLink").classList.remove("hidden");
-
-    setStatus("Kontrak selesai dibuat & tersimpan di Riwayat! Klik 'Unduh Kontrak DOCX'.", "ready");
-    await loadAllData();
-  } catch (err) {
-    setStatus(err.message || "Terjadi kesalahan saat membuat kontrak.", "error");
-  } finally {
-    btn.disabled = false; btn.textContent = "⚡ Buat & Simpan Kontrak DOCX";
-  }
-});
-
-// =====================================================================
-// UPLOAD TEMPLATE & SAVE SETTINGS HANDLERS
-// =====================================================================
-$("uploadTemplateForm").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const btn = $("uploadTplBtn"), box = $("tplStatus");
-  const name = $("tplName").value.trim(), file = $("tplFile").files[0];
-  if (!name || !file) return;
-
-  btn.disabled = true; btn.textContent = "Memindai & Meng-upload...";
-  box.classList.add("hidden");
-  try {
-    const info = await inspectDocxFile(file);
-    const storagePath = `${Date.now()}_${safeName(file.name.replace(/\.docx$/i, ""))}.docx`;
-    const { error: upErr } = await sb.storage.from("contract-templates").upload(storagePath, file, {
-      contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-    });
-    if (upErr) throw upErr;
-
-    await sb.from("contract_templates").update({ is_active: false }).eq("is_active", true);
-    const { error: insErr } = await sb.from("contract_templates").insert({
-      name, file_path: storagePath, mode: info.mode, custom_tags: info.customTags, is_active: true, uploaded_by: currentUser.id
-    });
-    if (insErr) throw insErr;
-
-    $("uploadTemplateForm").reset();
-    box.className = "notice info";
-    box.innerHTML = `<strong>Berhasil!</strong> Template aktif diperbarui (Mode: <code>${info.mode.toUpperCase()}</code>${info.customTags.length ? `, Kolom Baru: ${info.customTags.join(", ")}` : ""}). Semua laptop kini memakai acuan ini.`;
-    box.classList.remove("hidden");
-    await loadAllData();
-  } catch (err) {
-    box.className = "notice error";
-    box.textContent = "Gagal upload template: " + (err.message || err);
-    box.classList.remove("hidden");
-  } finally {
-    btn.disabled = false; btn.textContent = "☁️ Submit sebagai Acuan Aktif";
-  }
-});
-
-$("settingsForm").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const btn = $("saveSettingsBtn"), box = $("settingsStatus");
-  btn.disabled = true;
-  try {
-    const first_party = {
-      first_party_pt_entity: $("set_pt").value.trim(),
-      first_party_branch_area: $("set_area").value.trim(),
-      first_party_signatory: $("set_signatory").value.trim(),
-      first_party_authorizer: $("set_authorizer").value.trim(),
-      first_party_address: $("set_address").value.trim(),
-      first_party_notice_attention: $("set_signatory").value.trim(),
-      first_party_notice_address: $("set_address").value.trim(),
-      first_party_notice_telephone: $("set_tel").value.trim(),
-      first_party_notice_mobile: $("set_mobile").value.trim(),
-      first_party_notice_email: $("set_email").value.trim()
-    };
-    const fixed_penalties = {
-      transfer_penalty_fixed: Number($("set_pen_transfer").value),
-      brand_penalty_fixed: Number($("set_pen_brand").value),
-      legality_penalty_fixed: Number($("set_pen_legality").value),
-      affiliate_penalty_id: $("set_pen_aff_id").value.trim(),
-      affiliate_penalty_en: $("set_pen_aff_en").value.trim()
-    };
-    const { error } = await sb.from("app_settings").upsert({ id: 1, first_party, fixed_penalties, updated_at: new Date().toISOString() });
-    if (error) throw error;
-    box.className = "notice info"; box.textContent = "Pengaturan Pihak Pertama & Denda berhasil disimpan ke cloud!"; box.classList.remove("hidden");
-    await loadAllData();
-  } catch (err) {
-    box.className = "notice error"; box.textContent = "Gagal menyimpan: " + err.message; box.classList.remove("hidden");
-  } finally {
-    btn.disabled = false;
-  }
-});
-
-// =====================================================================
-// AUTH & NAVIGATION
-// =====================================================================
-function switchTab(tabId) {
-  document.querySelectorAll(".tab-btn").forEach(b => b.classList.toggle("active", b.dataset.tab === tabId));
-  document.querySelectorAll(".tab-panel").forEach(p => p.classList.toggle("hidden", p.id !== tabId));
-}
-document.querySelectorAll(".tab-btn").forEach(b => b.addEventListener("click", () => switchTab(b.dataset.tab)));
-form.addEventListener("change", (e) => { if (e.target.name === "deposit_payment_option") setPaymentFields(); updateProgress(); });
-form.addEventListener("input", (e) => { if (e.target.id === "partner_address" && $("second_party_notice_address_same").checked) syncNoticeAddress(); updateProgress(); });
-$("second_party_notice_address_same").addEventListener("change", () => { syncNoticeAddress(); updateProgress(); });
-$("clearButton").addEventListener("click", () => { form.reset(); setPaymentFields(); syncNoticeAddress(); $("downloadLink").classList.add("hidden"); updateProgress(); });
-$("historySearch").addEventListener("input", (e) => renderHistoryTable(e.target.value));
-
-// Render Kamus Tag
-$("tagCheatSheet").innerHTML = Object.entries(BUILTIN_TAGS).map(([k, desc]) => `<div class="tag-item"><code>{{${k}}}</code><br><span class="muted">${desc}</span></div>`).join("");
-
-$("loginForm").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  if (!sb) return;
-  $("loginError").classList.add("hidden");
-  $("loginBtn").disabled = true;
-  const { error } = await sb.auth.signInWithPassword({ email: $("loginEmail").value.trim(), password: $("loginPassword").value });
-  $("loginBtn").disabled = false;
-  if (error) { $("loginError").textContent = "Login gagal: " + error.message; $("loginError").classList.remove("hidden"); }
-});
-$("logoutBtn").addEventListener("click", () => sb.auth.signOut());
-
-async function init() {
-  if (!isConfigured) { $("configWarning").classList.remove("hidden"); $("loginBtn").disabled = true; return; }
-  const handleSession = async (session) => {
-    currentUser = session?.user || null;
-    $("loginSection").classList.toggle("hidden", Boolean(currentUser));
-    $("appSection").classList.toggle("hidden", !currentUser);
-    $("userBar").classList.toggle("hidden", !currentUser);
-    if (currentUser) {
-      $("userEmail").textContent = currentUser.email;
-      await loadAllData();
-    } else {
-      $("activeTplBadge").classList.add("hidden");
-    }
-  };
-  const { data } = await sb.auth.getSession();
-  await handleSession(data.session);
-  sb.auth.onAuthStateChange((_ev, session) => handleSession(session));
-}
-init();
-</script>
-</body>
-</html>
+    add("\\(
