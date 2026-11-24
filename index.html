@@ -863,7 +863,7 @@ const SUPABASE_URL = "https://lpjkhihdarlehixoskht.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_Cma34qB6pdFN6VveEY51Zw_uU_3-kJp";
 
 const isConfigured = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY && !SUPABASE_URL.includes("PROJECT_ID_LO"));
-const sb = isConfigured ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+const sb = isConfigured && window.supabase?.createClient ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 
 // =====================================================================
 // KONSTANTA & KAMUS SMART TAG
@@ -966,12 +966,15 @@ function dateId(d) { return `${d.getUTCDate()} ${MONTHS_ID[d.getUTCMonth()]} ${d
 function applyTheme(theme) {
   document.documentElement.setAttribute("data-theme", theme);
   $("themeToggle").textContent = theme === "dark" ? "☀️" : "🌙";
-  localStorage.setItem("kontrak_theme", theme);
 }
-applyTheme(localStorage.getItem("kontrak_theme") || "dark");
+let savedTheme = "dark";
+try { savedTheme = localStorage.getItem("kontrak_theme") || "dark"; } catch {}
+applyTheme(savedTheme);
 $("themeToggle").addEventListener("click", () => {
   const cur = document.documentElement.getAttribute("data-theme");
-  applyTheme(cur === "dark" ? "light" : "dark");
+  const theme = cur === "dark" ? "light" : "dark";
+  applyTheme(theme);
+  try { localStorage.setItem("kontrak_theme", theme); } catch {}
 });
 
 // Password visibility toggle
@@ -1356,4 +1359,540 @@ function replaceParagraphLegacy(p, v, signatureIndex, contactIndexes) {
   } else if (low.includes("subsequent installment payments") || low.includes("pembayaran angsuran selanjutnya")) {
     const n = v.deposit_monthly_installment_idr_value;
     add("\\[x\\]", moneyText(n));
-    add("\\(
+    add("\\(masukkan bilangan\\)", low.includes("subsequent installment") ? wordsEn(n) : wordsId(n));
+  }
+  if (low.includes("starting from") && low.includes("may be extended")) seq("\\[date\\s*/\\s*month\\s*/\\s*year\\]", [dateEn(v.effective_start_date_value), dateEn(v.effective_end_date_value)]);
+  if (low.includes("terhitung efektif sejak") && low.includes("dapat diperpanjang")) seq("\\[tanggal\\s*/\\s*bulan\\s*/\\s*tahun\\]", [dateId(v.effective_start_date_value), dateId(v.effective_end_date_value)]);
+  if (low.includes("term of this agreement is")) add("\\b1\\s*\\(one\\)\\s*year\\b", `${v.term_years_value} (${wordsEn(v.term_years_value)}) year`);
+  if (low.includes("jangka waktu perjanjian adalah selama")) add("\\b1\\s*\\(satu\\)\\s*tahun\\b", `${v.term_years_value} (${wordsId(v.term_years_value)}) tahun`);
+
+  if (!repls.length) return;
+  repls.sort((a, b) => b[0] - a[0]);
+  for (const [start, end, val] of repls) replaceSpan(nodes, start, end, String(val));
+}
+
+async function generateLegacyDocx(zip, v) {
+  const parts = Object.keys(zip.files).filter(n => n === "word/document.xml" || /^word\/(header|footer)\d+\.xml$/.test(n));
+  const signatureIndex = { value: 0 }, contactIndexes = {}, numberOverrides = [];
+
+  for (const part of parts) {
+    const xml = await zip.file(part).async("string");
+    const doc = new DOMParser().parseFromString(xml, "application/xml");
+    if (part === "word/document.xml") {
+      const groups = new Map();
+      for (const p of doc.getElementsByTagNameNS(WORD_NS, "p")) {
+        let cell = p.parentNode;
+        while (cell && !(cell.namespaceURI === WORD_NS && cell.localName === "tc")) cell = cell.parentNode;
+        if (cell) { if (!groups.has(cell)) groups.set(cell, []); groups.get(cell).push(p); }
+      }
+      const full = v.deposit_payment_option === "full";
+      for (const paragraphs of groups.values()) {
+        const texts = paragraphs.map(p => paragraphText(p).trim());
+        const fullIdx = texts.findIndex(t => t.toLowerCase().startsWith("full payment in a single, upfront lump sum") || t.toLowerCase().startsWith("pembayaran dilakukan secara penuh (lunas)"));
+        const instIdx = texts.findIndex(t => t.toLowerCase().startsWith("payment may also be made through monthly deductions") || t.toLowerCase().startsWith("pembayaran dilakukan melalui pemotongan akun jfs"));
+        if (fullIdx < 0 || instIdx < 0) continue;
+        let remove = [];
+        if (full) {
+          const endIdx = texts.findIndex((t, i) => i > instIdx && (t.toLowerCase().startsWith("for the avoidance of doubt") || t.toLowerCase().startsWith("untuk menghindari keraguan")));
+          if (endIdx > instIdx) remove = paragraphs.slice(fullIdx + 1, endIdx + 1);
+        } else {
+          const optP = paragraphs[instIdx];
+          const numId = optP.getElementsByTagNameNS(WORD_NS, "numId")[0];
+          const ilvl = optP.getElementsByTagNameNS(WORD_NS, "ilvl")[0];
+          if (numId && ilvl) numberOverrides.push({ numId: numId.getAttributeNS(WORD_NS, "val"), ilvl: ilvl.getAttributeNS(WORD_NS, "val") || "0" });
+          remove = paragraphs.slice(fullIdx, instIdx);
+        }
+        for (const p of remove) p.parentNode.removeChild(p);
+      }
+      if (full) {
+        for (const p of [...doc.getElementsByTagNameNS(WORD_NS, "p")]) {
+          const t = paragraphText(p).toLowerCase();
+          if (t.includes("fails make installment payments of the deposit fee") || t.includes("tidak melakukan angsuran pembayaran biaya deposit")) p.parentNode.removeChild(p);
+        }
+      }
+    }
+    for (const p of doc.getElementsByTagNameNS(WORD_NS, "p")) replaceParagraphLegacy(p, v, signatureIndex, contactIndexes);
+    zip.file(part, new XMLSerializer().serializeToString(doc));
+  }
+
+  if (numberOverrides.length && zip.file("word/numbering.xml")) {
+    const ndoc = new DOMParser().parseFromString(await zip.file("word/numbering.xml").async("string"), "application/xml");
+    for (const item of numberOverrides) {
+      const num = [...ndoc.getElementsByTagNameNS(WORD_NS, "num")].find(n => n.getAttributeNS(WORD_NS, "numId") === item.numId);
+      if (!num) continue;
+      let level = [...num.getElementsByTagNameNS(WORD_NS, "lvlOverride")].find(n => n.getAttributeNS(WORD_NS, "ilvl") === item.ilvl);
+      if (!level) { level = ndoc.createElementNS(WORD_NS, "w:lvlOverride"); level.setAttributeNS(WORD_NS, "w:ilvl", item.ilvl); num.appendChild(level); }
+      let start = level.getElementsByTagNameNS(WORD_NS, "startOverride")[0];
+      if (!start) { start = ndoc.createElementNS(WORD_NS, "w:startOverride"); level.appendChild(start); }
+      start.setAttributeNS(WORD_NS, "w:val", "2");
+    }
+    zip.file("word/numbering.xml", new XMLSerializer().serializeToString(ndoc));
+  }
+}
+
+// =====================================================================
+// SUPABASE DATA LOADERS & UI RENDERERS
+// =====================================================================
+async function loadAllData() {
+  const errBox = $("dbErrorAlert");
+  errBox.classList.add("hidden");
+
+  const [setRes, tplRes, histRes] = await Promise.all([
+    sb.from("app_settings").select("*").eq("id", 1).single(),
+    sb.from("contract_templates").select("*").order("created_at", { ascending: false }),
+    sb.from("contract_history").select("*").order("created_at", { ascending: false }).limit(100)
+  ]);
+
+  const firstErr = setRes.error || tplRes.error || histRes.error;
+  if (firstErr) {
+    errBox.innerHTML = `<strong>Gagal membaca database Supabase:</strong> ${esc(firstErr.message)}. Pastikan kode SQL setup sudah dijalankan di SQL Editor Supabase.`;
+    errBox.classList.remove("hidden");
+  }
+
+  if (setRes.data) { appSettings = setRes.data; populateSettingsForm(); }
+  templatesList = tplRes.data || [];
+  activeTemplate = templatesList.find(t => t.is_active) || null;
+  historyList = histRes.data || [];
+
+  renderActiveTemplateUI();
+  renderTemplatesTable();
+  renderHistoryTable();
+}
+
+function renderActiveTemplateUI() {
+  const badge = $("activeTplBadge");
+  const alertBox = $("noTemplateAlert");
+  const infoBox = $("activeTemplateInfo");
+  const customSec = $("customFieldsSection");
+  const customCont = $("customFieldsContainer");
+
+  if (!activeTemplate) {
+    badge.textContent = "Belum ada acuan";
+    badge.className = "badge";
+    badge.classList.remove("hidden");
+    alertBox.classList.remove("hidden");
+    infoBox.classList.add("hidden");
+    customSec.classList.add("hidden");
+    customCont.innerHTML = "";
+    return;
+  }
+
+  alertBox.classList.add("hidden");
+  badge.textContent = `Acuan: ${activeTemplate.name} (${activeTemplate.mode.toUpperCase()})`;
+  badge.className = `badge ${activeTemplate.mode}`;
+  badge.classList.remove("hidden");
+
+  infoBox.innerHTML = `<strong>Kontrak Acuan Aktif:</strong> ${esc(activeTemplate.name)} &nbsp;|&nbsp; Mode: <code>${esc(activeTemplate.mode.toUpperCase())}</code> &nbsp;|&nbsp; Pihak Pertama: <strong>PT ${esc(appSettings.first_party.first_party_pt_entity || "-")}</strong> (PIC: ${esc(appSettings.first_party.first_party_signatory || "-")})`;
+  infoBox.classList.remove("hidden");
+
+  const customTags = Array.isArray(activeTemplate.custom_tags) ? activeTemplate.custom_tags : [];
+  if (customTags.length > 0) {
+    customSec.classList.remove("hidden");
+    customCont.innerHTML = customTags.map(tag => `
+      <div class="field">
+        <label for="custom_${esc(tag)}">${esc(tag.replaceAll("_", " "))} <span class="req">*</span></label>
+        <input id="custom_${esc(tag)}" data-custom-tag="${esc(tag)}" required placeholder="Isi nilai untuk {{${esc(tag)}}}">
+      </div>
+    `).join("");
+  } else {
+    customSec.classList.add("hidden");
+    customCont.innerHTML = "";
+  }
+  updateProgress();
+}
+
+function renderTemplatesTable() {
+  const tbody = $("templatesTableBody");
+  if (!templatesList.length) {
+    tbody.innerHTML = `<tr><td colspan="5" class="muted">Belum ada kontrak acuan yang di-upload.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = templatesList.map(t => {
+    const dt = new Date(t.created_at).toLocaleString("id-ID");
+    const tags = (t.custom_tags || []).map(x => `<code>{{${esc(x)}}}</code>`).join(" ") || "-";
+    return `
+      <tr>
+        <td><strong>${esc(t.name)}</strong> ${t.is_active ? '<span class="badge dynamic">AKTIF</span>' : ""}</td>
+        <td><code>${esc(t.mode)}</code></td>
+        <td>${tags}</td>
+        <td>${esc(dt)}</td>
+        <td>
+          ${!t.is_active ? `<button type="button" class="btn-sm btn-secondary" onclick="activateTemplate('${t.id}')">Aktifkan</button>` : ""}
+          <button type="button" class="btn-sm btn-secondary" onclick="downloadTemplate('${esc(t.file_path)}','${esc(t.name)}')">Unduh</button>
+          <button type="button" class="btn-sm btn-danger" onclick="deleteTemplate('${t.id}','${esc(t.file_path)}')">Hapus</button>
+        </td>
+      </tr>`;
+  }).join("");
+}
+
+function renderHistoryTable(filter = "") {
+  const tbody = $("historyTableBody");
+  const q = filter.trim().toLowerCase();
+  const rows = historyList.filter(h => !q || `${h.agreement_no} ${h.partner_name} ${h.partner_code}`.toLowerCase().includes(q));
+  if (!rows.length) {
+    tbody.innerHTML = `<tr><td colspan="5" class="muted">Belum ada riwayat kontrak.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = rows.map(h => `
+    <tr>
+      <td>${esc(new Date(h.created_at).toLocaleString("id-ID"))}</td>
+      <td><code>${esc(h.agreement_no)}</code></td>
+      <td><strong>${esc(h.partner_name)}</strong></td>
+      <td>${esc(h.partner_code)}</td>
+      <td>
+        <button type="button" class="btn-sm btn-secondary" onclick="loadHistoryIntoForm('${h.id}')">Muat ke Form</button>
+        <button type="button" class="btn-sm btn-danger" onclick="deleteHistory('${h.id}')">Hapus</button>
+      </td>
+    </tr>`).join("");
+}
+
+function populateSettingsForm() {
+  const fp = appSettings.first_party || {}, pen = appSettings.fixed_penalties || {};
+  $("set_pt").value = fp.first_party_pt_entity || "";
+  $("set_area").value = fp.first_party_branch_area || "";
+  $("set_signatory").value = fp.first_party_signatory || "";
+  $("set_authorizer").value = fp.first_party_authorizer || "";
+  $("set_address").value = fp.first_party_address || "";
+  $("set_tel").value = fp.first_party_notice_telephone || "-";
+  $("set_mobile").value = fp.first_party_notice_mobile || "";
+  $("set_email").value = fp.first_party_notice_email || "";
+  $("set_pen_transfer").value = pen.transfer_penalty_fixed ?? 20000000;
+  $("set_pen_brand").value = pen.brand_penalty_fixed ?? 10000000;
+  $("set_pen_legality").value = pen.legality_penalty_fixed ?? 2000000;
+  $("set_pen_aff_id").value = pen.affiliate_penalty_id || "";
+  $("set_pen_aff_en").value = pen.affiliate_penalty_en || "";
+}
+
+// =====================================================================
+// AKSI TEMPLATE & RIWAYAT (GLOBAL HANDLERS)
+// =====================================================================
+window.activateTemplate = async (id) => {
+  await sb.from("contract_templates").update({ is_active: false }).neq("id", id);
+  await sb.from("contract_templates").update({ is_active: true }).eq("id", id);
+  await loadAllData();
+};
+window.downloadTemplate = async (path, name) => {
+  const { data, error } = await sb.storage.from("contract-templates").download(path);
+  if (error) return alert("Gagal mengunduh template: " + error.message);
+  const url = URL.createObjectURL(data);
+  const a = document.createElement("a"); a.href = url; a.download = `${safeName(name)}.docx`; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+};
+window.deleteTemplate = async (id, path) => {
+  if (!confirm("Hapus template acuan ini?")) return;
+  await sb.storage.from("contract-templates").remove([path]);
+  await sb.from("contract_templates").delete().eq("id", id);
+  await loadAllData();
+};
+window.deleteHistory = async (id) => {
+  if (!confirm("Hapus riwayat kontrak ini?")) return;
+  await sb.from("contract_history").delete().eq("id", id);
+  await loadAllData();
+};
+window.loadHistoryIntoForm = (id) => {
+  const row = historyList.find(h => h.id === id);
+  if (!row || !row.form_data) return;
+  const d = row.form_data;
+  for (const [k, val] of Object.entries(d)) {
+    if (k === "deposit_payment_option") {
+      const r = document.querySelector(`input[name="deposit_payment_option"][value="${val}"]`);
+      if (r) r.checked = true;
+    } else if (k === "custom_fields" && val && typeof val === "object") {
+      for (const [ck, cv] of Object.entries(val)) {
+        const el = $(`custom_${ck}`);
+        if (el) el.value = cv;
+      }
+    } else {
+      const el = $(k);
+      if (el) el.value = val ?? "";
+    }
+  }
+  setPaymentFields();
+  updateProgress();
+  switchTab("tabForm");
+  setStatus(`Data kontrak "${d.partner_name}" dimuat. Silakan ubah lalu klik Buat & Simpan Kontrak DOCX.`, "ready");
+};
+
+// =====================================================================
+// FORM VALIDATION & CONTRACT GENERATION
+// =====================================================================
+const form = $("contractForm");
+function setStatus(msg, kind = "") {
+  $("statusText").textContent = msg;
+  $("status").classList.toggle("ready", kind === "ready");
+  $("status").classList.toggle("error", kind === "error");
+}
+function valueOf(name) { return String(new FormData(form).get(name) ?? "").trim(); }
+function setPaymentFields() {
+  const inst = valueOf("deposit_payment_option") === "installment";
+  $("installmentFields").classList.toggle("hidden", !inst);
+  $("deposit_first_payment_idr").required = inst;
+  $("deposit_monthly_installment_idr").required = inst;
+}
+function syncNoticeAddress() {
+  const same = $("second_party_notice_address_same").checked;
+  const target = $("second_party_notice_address");
+  if (same) { target.value = $("partner_address").value; target.readOnly = true; }
+  else target.readOnly = false;
+}
+function updateProgress() {
+  const controls = [...form.querySelectorAll("input[required]")].filter(el => !el.closest(".hidden"));
+  const done = controls.filter(el => el.type === "radio" ? Boolean(form.querySelector(`input[name="${el.name}"]:checked`)) : el.value.trim() !== "").length;
+  const percent = controls.length ? Math.round(100 * done / controls.length) : 0;
+  $("progressPct").textContent = percent + "%";
+  $("progressFill").style.width = percent + "%";
+  if (done === controls.length) setStatus("Semua kolom wajib terisi. Siap membuat kontrak DOCX!", "ready");
+  else setStatus(`${done} dari ${controls.length} kolom wajib sudah diisi.`);
+}
+function parseDateUTC(raw, label) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) throw new Error(`${label} belum valid.`);
+  const [y, m, d] = raw.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d));
+}
+function parseIntStrict(raw, label, min = 0) {
+  if (raw === "") throw new Error(`${label} belum diisi.`);
+  const n = Number(raw);
+  if (!Number.isSafeInteger(n) || n < min) throw new Error(`${label} harus angka bulat minimal ${min}.`);
+  return n;
+}
+function collectFormValues() {
+  const v = {
+    agreement_no: valueOf("agreement_no").replace(/^\[([\s\S]*)\]$/, "$1").trim(),
+    signing_date: valueOf("signing_date"),
+    signing_location: valueOf("signing_location"),
+    partner_name: valueOf("partner_name"),
+    partner_nik: valueOf("partner_nik"),
+    partner_address: valueOf("partner_address"),
+    partner_code: valueOf("partner_code"),
+    partner_description: valueOf("partner_description"),
+    operating_area: valueOf("operating_area"),
+    second_party_notice_attention: valueOf("second_party_notice_attention"),
+    second_party_notice_telephone: valueOf("second_party_notice_telephone"),
+    second_party_notice_address: valueOf("second_party_notice_address"),
+    second_party_notice_mobile: valueOf("second_party_notice_mobile"),
+    second_party_notice_email: valueOf("second_party_notice_email"),
+    deposit_payment_option: valueOf("deposit_payment_option"),
+    material_fee_idr: valueOf("material_fee_idr"),
+    deposit_fee_idr: valueOf("deposit_fee_idr"),
+    branding_fee_idr: valueOf("branding_fee_idr"),
+    deposit_first_payment_idr: valueOf("deposit_first_payment_idr"),
+    deposit_monthly_installment_idr: valueOf("deposit_monthly_installment_idr"),
+    term_years: valueOf("term_years"),
+    effective_start_date: valueOf("effective_start_date"),
+    effective_end_date: valueOf("effective_end_date"),
+    custom_fields: {}
+  };
+  if (!v.agreement_no) throw new Error("Nomor perjanjian wajib diisi.");
+  if (!/^[0-9]{16}$/.test(v.partner_nik)) throw new Error("NIK mitra harus tepat 16 digit angka.");
+  if (!["full", "installment"].includes(v.deposit_payment_option)) throw new Error("Pilih salah satu skema deposit.");
+  v.signing_date_value = parseDateUTC(v.signing_date, "Tanggal penandatanganan");
+  v.effective_start_date_value = parseDateUTC(v.effective_start_date, "Tanggal mulai");
+  v.effective_end_date_value = parseDateUTC(v.effective_end_date, "Tanggal akhir");
+  if (v.effective_end_date_value <= v.effective_start_date_value) throw new Error("Tanggal akhir harus setelah tanggal mulai.");
+  v.term_years_value = parseIntStrict(v.term_years, "Lama perjanjian", 1);
+  v.material_fee_idr_value = parseIntStrict(v.material_fee_idr, "Biaya material");
+  v.deposit_fee_idr_value = parseIntStrict(v.deposit_fee_idr, "Total biaya deposit");
+  v.branding_fee_idr_value = parseIntStrict(v.branding_fee_idr, "Biaya branding");
+  if (v.deposit_payment_option === "installment") {
+    v.deposit_first_payment_idr_value = parseIntStrict(v.deposit_first_payment_idr, "Deposit pertama");
+    v.deposit_monthly_installment_idr_value = parseIntStrict(v.deposit_monthly_installment_idr, "Angsuran bulanan");
+  }
+  for (const el of document.querySelectorAll("[data-custom-tag]")) {
+    const val = el.value.trim();
+    if (!val) throw new Error(`Kolom tambahan "${el.dataset.customTag}" belum diisi.`);
+    v.custom_fields[el.dataset.customTag] = val;
+  }
+  return v;
+}
+
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  $("downloadLink").classList.add("hidden");
+  if (!activeTemplate) return setStatus("Upload kontrak acuan terlebih dahulu di tab Kontrak Acuan.", "error");
+  if (!form.reportValidity()) return;
+
+  const btn = $("generateButton");
+  btn.disabled = true; btn.textContent = "Memproses DOCX...";
+  setStatus("Mengunduh template dari cloud & menyusun kontrak...");
+
+  try {
+    const v = collectFormValues();
+    const { data: tplBlob, error: dlErr } = await sb.storage.from("contract-templates").download(activeTemplate.file_path);
+    if (dlErr) throw new Error("Gagal mengambil template dari cloud: " + dlErr.message);
+
+    const zip = await JSZip.loadAsync(tplBlob);
+    if (activeTemplate.mode === "dynamic") await generateDynamicDocx(zip, v);
+    else await generateLegacyDocx(zip, v);
+
+    const outBlob = await zip.generateAsync({
+      type: "blob",
+      mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      compression: "DEFLATE"
+    });
+
+    // Simpan riwayat ke database Supabase
+    const savePayload = { ...v };
+    delete savePayload.signing_date_value; delete savePayload.effective_start_date_value; delete savePayload.effective_end_date_value;
+    await sb.from("contract_history").insert({
+      template_id: activeTemplate.id,
+      agreement_no: v.agreement_no,
+      partner_name: v.partner_name,
+      partner_code: v.partner_code,
+      form_data: savePayload,
+      created_by: currentUser.id
+    });
+
+    const d = v.signing_date_value;
+    const fileName = `Kontrak_MitraA_${safeName(v.partner_name)}_${d.getUTCFullYear()}${String(d.getUTCMonth()+1).padStart(2,"0")}${String(d.getUTCDate()).padStart(2,"0")}.docx`;
+    if (currentObjectUrl) URL.revokeObjectURL(currentObjectUrl);
+    currentObjectUrl = URL.createObjectURL(outBlob);
+    $("downloadLink").href = currentObjectUrl;
+    $("downloadLink").download = fileName;
+    $("downloadLink").classList.remove("hidden");
+
+    setStatus("Kontrak selesai dibuat & tersimpan di Riwayat! Klik 'Unduh Kontrak DOCX'.", "ready");
+    await loadAllData();
+  } catch (err) {
+    setStatus(err.message || "Terjadi kesalahan saat membuat kontrak.", "error");
+  } finally {
+    btn.disabled = false; btn.textContent = "⚡ Buat & Simpan Kontrak DOCX";
+  }
+});
+
+// =====================================================================
+// UPLOAD TEMPLATE & SAVE SETTINGS HANDLERS
+// =====================================================================
+$("uploadTemplateForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const btn = $("uploadTplBtn"), box = $("tplStatus");
+  const name = $("tplName").value.trim(), file = $("tplFile").files[0];
+  if (!name || !file) return;
+
+  btn.disabled = true; btn.textContent = "Memindai & Meng-upload...";
+  box.classList.add("hidden");
+  try {
+    const info = await inspectDocxFile(file);
+    const storagePath = `${Date.now()}_${safeName(file.name.replace(/\.docx$/i, ""))}.docx`;
+    const { error: upErr } = await sb.storage.from("contract-templates").upload(storagePath, file, {
+      contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    });
+    if (upErr) throw upErr;
+
+    await sb.from("contract_templates").update({ is_active: false }).eq("is_active", true);
+    const { error: insErr } = await sb.from("contract_templates").insert({
+      name, file_path: storagePath, mode: info.mode, custom_tags: info.customTags, is_active: true, uploaded_by: currentUser.id
+    });
+    if (insErr) throw insErr;
+
+    $("uploadTemplateForm").reset();
+    box.className = "notice info";
+    box.innerHTML = `<strong>Berhasil!</strong> Template aktif diperbarui (Mode: <code>${info.mode.toUpperCase()}</code>${info.customTags.length ? `, Kolom Baru: ${info.customTags.join(", ")}` : ""}). Semua laptop kini memakai acuan ini.`;
+    box.classList.remove("hidden");
+    await loadAllData();
+  } catch (err) {
+    box.className = "notice error";
+    box.textContent = "Gagal upload template: " + (err.message || err);
+    box.classList.remove("hidden");
+  } finally {
+    btn.disabled = false; btn.textContent = "☁️ Submit sebagai Acuan Aktif";
+  }
+});
+
+$("settingsForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const btn = $("saveSettingsBtn"), box = $("settingsStatus");
+  btn.disabled = true;
+  try {
+    const first_party = {
+      first_party_pt_entity: $("set_pt").value.trim(),
+      first_party_branch_area: $("set_area").value.trim(),
+      first_party_signatory: $("set_signatory").value.trim(),
+      first_party_authorizer: $("set_authorizer").value.trim(),
+      first_party_address: $("set_address").value.trim(),
+      first_party_notice_attention: $("set_signatory").value.trim(),
+      first_party_notice_address: $("set_address").value.trim(),
+      first_party_notice_telephone: $("set_tel").value.trim(),
+      first_party_notice_mobile: $("set_mobile").value.trim(),
+      first_party_notice_email: $("set_email").value.trim()
+    };
+    const fixed_penalties = {
+      transfer_penalty_fixed: Number($("set_pen_transfer").value),
+      brand_penalty_fixed: Number($("set_pen_brand").value),
+      legality_penalty_fixed: Number($("set_pen_legality").value),
+      affiliate_penalty_id: $("set_pen_aff_id").value.trim(),
+      affiliate_penalty_en: $("set_pen_aff_en").value.trim()
+    };
+    const { error } = await sb.from("app_settings").upsert({ id: 1, first_party, fixed_penalties, updated_at: new Date().toISOString() });
+    if (error) throw error;
+    box.className = "notice info"; box.textContent = "Pengaturan Pihak Pertama & Denda berhasil disimpan ke cloud!"; box.classList.remove("hidden");
+    await loadAllData();
+  } catch (err) {
+    box.className = "notice error"; box.textContent = "Gagal menyimpan: " + err.message; box.classList.remove("hidden");
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+// =====================================================================
+// AUTH & NAVIGATION
+// =====================================================================
+function switchTab(tabId) {
+  document.querySelectorAll(".tab-btn").forEach(b => b.classList.toggle("active", b.dataset.tab === tabId));
+  document.querySelectorAll(".tab-panel").forEach(p => p.classList.toggle("hidden", p.id !== tabId));
+}
+document.querySelectorAll(".tab-btn").forEach(b => b.addEventListener("click", () => switchTab(b.dataset.tab)));
+form.addEventListener("change", (e) => { if (e.target.name === "deposit_payment_option") setPaymentFields(); updateProgress(); });
+form.addEventListener("input", (e) => { if (e.target.id === "partner_address" && $("second_party_notice_address_same").checked) syncNoticeAddress(); updateProgress(); });
+$("second_party_notice_address_same").addEventListener("change", () => { syncNoticeAddress(); updateProgress(); });
+$("clearButton").addEventListener("click", () => { form.reset(); setPaymentFields(); syncNoticeAddress(); $("downloadLink").classList.add("hidden"); updateProgress(); });
+$("historySearch").addEventListener("input", (e) => renderHistoryTable(e.target.value));
+
+// Render Kamus Tag
+$("tagCheatSheet").innerHTML = Object.entries(BUILTIN_TAGS).map(([k, desc]) => `<div class="tag-item"><code>{{${k}}}</code><br><span class="muted">${desc}</span></div>`).join("");
+
+$("loginForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (!sb) return;
+  $("loginError").classList.add("hidden");
+  $("loginBtn").disabled = true;
+  try {
+    const { error } = await sb.auth.signInWithPassword({ email: $("loginEmail").value.trim(), password: $("loginPassword").value });
+    if (error) throw error;
+  } catch (error) {
+    $("loginError").textContent = "Login gagal: " + error.message;
+    $("loginError").classList.remove("hidden");
+  } finally {
+    $("loginBtn").disabled = false;
+  }
+});
+$("logoutBtn").addEventListener("click", () => sb.auth.signOut());
+
+function init() {
+  if (!sb) {
+    if (isConfigured) $("configWarning").textContent = "Layanan login gagal dimuat. Periksa koneksi lalu muat ulang halaman.";
+    $("configWarning").classList.remove("hidden");
+    $("loginBtn").disabled = true;
+    return;
+  }
+  sb.auth.onAuthStateChange((_event, session) => {
+    const previousId = currentUser?.id;
+    currentUser = session?.user || null;
+    $("loginSection").classList.toggle("hidden", Boolean(currentUser));
+    $("appSection").classList.toggle("hidden", !currentUser);
+    $("userBar").classList.toggle("hidden", !currentUser);
+    if (currentUser) {
+      $("userEmail").textContent = currentUser.email;
+      if (currentUser.id !== previousId) {
+        // Read workspace data after Supabase releases its auth lock.
+        const userId = currentUser.id;
+        setTimeout(() => { if (currentUser?.id === userId) loadAllData(); }, 0);
+      }
+    } else {
+      $("activeTplBadge").classList.add("hidden");
+    }
+  });
+}
+init();
+</script>
+</body>
+</html>
